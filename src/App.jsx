@@ -4,6 +4,7 @@ import Header from './components/Header.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import MapView from './components/MapView.jsx'
 import BusDetailPanel from './components/BusDetailPanel.jsx'
+import BottomNav from './components/BottomNav.jsx'
 import './index.css'
 
 const REFRESH_INTERVAL = 30000
@@ -271,19 +272,30 @@ function App() {
     favorites, onToggleFavorite: toggleFavorite,
   }
 
+  const mobileSheetOpen = activePanel !== 'map'
+
   return (
     <div className="app">
       <AlertsBanner />
       <Header isLive={isLive} theme={theme} onToggleTheme={toggleTheme} />
       <div className="app-body">
+        {/* Desktop: backdrop dims map when sidebar is open */}
         {sidebarOpen && (
           <div
             className="sidebar-backdrop"
             onClick={() => setSidebarOpen(false)}
           />
         )}
+        {/* Mobile: backdrop dims map when bottom sheet is open */}
+        {mobileSheetOpen && (
+          <div
+            className="mobile-sheet-backdrop"
+            onClick={() => setActivePanel('map')}
+          />
+        )}
         <Sidebar
           open={sidebarOpen}
+          mobileSheetOpen={mobileSheetOpen}
           activePanel={activePanel}
           onPanelChange={setActivePanel}
           onToggle={() => setSidebarOpen(o => !o)}
@@ -325,6 +337,11 @@ function App() {
           />
         </div>
       </div>
+      <BottomNav
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
+        favorites={favorites}
+      />
     </div>
   )
 }

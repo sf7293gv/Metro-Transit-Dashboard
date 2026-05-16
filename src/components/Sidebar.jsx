@@ -110,7 +110,7 @@ const PANELS = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite, onTripUpdate }) {
+function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite, onTripUpdate }) {
   const [sidebarWidth, setSidebarWidth] = useState(loadSavedWidth)
 
   const wrapperRef  = useRef(null)
@@ -164,8 +164,11 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
   }
 
   return (
-    <div ref={wrapperRef} className={`sidebar-wrapper${open ? '' : ' collapsed'}`}>
+    <div ref={wrapperRef} className={`sidebar-wrapper${open ? '' : ' collapsed'}${mobileSheetOpen ? ' sheet-open' : ''}`}>
       <div className="sidebar">
+
+        {/* Mobile drag handle — decorative affordance, hidden on desktop */}
+        <div className="sheet-drag-handle" aria-hidden="true" />
 
         <nav className="sidebar-nav">
           {PANELS.map(({ id, label, Icon }) => (

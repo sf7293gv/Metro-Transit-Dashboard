@@ -1459,10 +1459,12 @@ html, body, #root {
   box-shadow: 0 0 0 3px var(--accent), 0 4px 18px rgba(0, 0, 0, 0.7);
 }
 
-/* Mobile — bottom sheet */
+/* Mobile — bottom sheet (positioned above bottom nav) */
 @media (max-width: 768px) {
   .bus-detail-panel {
+    position: fixed;
     top: auto;
+    bottom: var(--bottom-nav-height, 56px);
     left: 0;
     right: 0;
     width: 100%;
@@ -1470,7 +1472,7 @@ html, body, #root {
     border-left: none;
     border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    transform: translateY(100%);
+    transform: translateY(110%);
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
   }
 
@@ -1887,51 +1889,289 @@ html, body, #root {
 }
 
 /* ===================================================
-   Mobile (≤ 768px) — Sidebar becomes a drawer
+   Mobile (≤ 768px) — Bottom nav + Bottom sheet layout
    =================================================== */
 
+/* Base declarations: hidden on desktop, visible only via mobile media query */
+.bottom-nav           { display: none; }
+.mobile-sheet-backdrop { display: none; }
+.sheet-drag-handle    { display: none; }
+
 @media (max-width: 768px) {
+  /* ── CSS tokens ── */
   :root {
-    --header-height: 56px;
-    --sidebar-width: 300px;
+    --header-height:    52px;
+    --bottom-nav-height: 56px;
   }
 
+  /* ── Header: compact — logo + theme toggle only ── */
   .header {
+    height: var(--header-height);
     padding: 0 16px;
-    gap: 10px;
+    gap: 12px;
   }
 
   .header-logo { height: 28px; }
-  .header-subtitle { display: none; }
 
-  /* Sidebar overlays map on mobile */
+  .header-divider,
+  .header-text,
+  .live-badge {
+    display: none;
+  }
+
+  /* ── Sidebar → bottom sheet ── */
   .sidebar-wrapper {
-    position: fixed;
-    top: var(--header-height);
-    left: 0;
-    bottom: 0;
-    width: var(--sidebar-width) !important;
-    transform: translateX(0);
-    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 900;
+    position: fixed !important;
+    top: auto !important;
+    bottom: var(--bottom-nav-height) !important;
+    left: 0 !important;
+    right: 0;
+    width: 100% !important;
+    height: 80vh;
+    max-height: 80vh;
+    transform: translateY(110%);
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.55);
+    z-index: 500;
+    overflow: hidden;
   }
 
+  /* collapsed class has no visual meaning on mobile — sheet-open drives it */
   .sidebar-wrapper.collapsed {
-    width: var(--sidebar-width) !important;
-    transform: translateX(calc(-1 * var(--sidebar-width)));
+    width: 100% !important;
+    transform: translateY(110%);
   }
 
-  .sidebar-backdrop {
+  /* sheet is visible */
+  .sidebar-wrapper.sheet-open {
+    transform: translateY(0) !important;
+  }
+
+  /* suppress resize animation during drag (already !important on desktop) */
+  .sidebar-wrapper.resizing {
+    transition: none !important;
+  }
+
+  /* ── Sidebar internals ── */
+  .sidebar {
+    height: 100%;
+    overflow: hidden;
+    border-right: none;
+    border-radius: 18px 18px 0 0;
+  }
+
+  /* nav tabs are replaced by bottom nav */
+  .sidebar-nav {
+    display: none;
+  }
+
+  .sidebar-content {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* ── Sheet drag handle ── */
+  .sheet-drag-handle {
     display: block;
-    position: fixed;
-    inset: var(--header-height) 0 0 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 899;
+    width: 40px;
+    height: 4px;
+    background: var(--text-muted);
+    opacity: 0.35;
+    border-radius: 2px;
+    margin: 10px auto 6px;
+    flex-shrink: 0;
   }
 
-  /* No resize handle on mobile — drawer is fixed-width */
+  /* ── Sidebar resize handle: hidden on mobile ── */
   .sidebar-resize-handle {
     display: none;
+  }
+
+  /* ── Desktop sidebar-open button: hidden on mobile ── */
+  .sidebar-open-btn {
+    display: none;
+  }
+
+  /* ── Desktop sidebar backdrop: hidden on mobile (bottom sheet has its own) ── */
+  .sidebar-backdrop {
+    display: none !important;
+  }
+
+  /* ── Mobile bottom sheet backdrop ── */
+  .mobile-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0 0 var(--bottom-nav-height) 0;
+    background: rgba(0, 0, 0, 0.52);
+    z-index: 499;
+  }
+
+  /* ── Map: full screen behind the sheet ── */
+  .map-area {
+    width: 100%;
+  }
+
+  /* ── Bottom navigation bar ── */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--bottom-nav-height);
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    z-index: 1000;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.3);
+    /* iPhone safe-area */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font);
+    cursor: pointer;
+    padding: 6px 2px;
+    position: relative;
+    transition: color 0.15s;
+    min-height: 56px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-tab.active {
+    color: var(--accent);
+  }
+
+  .bottom-nav-tab.active .bottom-nav-icon {
+    transform: scale(1.12);
+  }
+
+  .bottom-nav-icon {
+    font-size: 19px;
+    line-height: 1;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .bottom-nav-label {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .bottom-nav-badge {
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 17px);
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 8px;
+    font-weight: 700;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  /* ── Touch-friendly sizing (minimum 44px tap targets) ── */
+
+  .panel-input,
+  .route-input {
+    padding: 13px 14px;
+    font-size: 16px; /* 16px prevents iOS zoom-on-focus */
+  }
+
+  .panel-btn,
+  .track-btn {
+    min-height: 48px;
+    padding: 13px 16px;
+    font-size: 15px;
+  }
+
+  .routes-search {
+    padding: 13px 13px 13px 40px;
+    font-size: 16px;
+  }
+
+  .route-item {
+    padding: 14px 18px;
+    min-height: 48px;
+  }
+
+  /* always show Track button on mobile (no hover) */
+  .route-item .route-item-track {
+    opacity: 1;
+  }
+
+  .history-chip {
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+
+  .star-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .stop-suggestion-item {
+    padding: 14px 16px;
+    min-height: 48px;
+    font-size: 14px;
+  }
+
+  .stop-suggestion-name {
+    font-size: 14px;
+  }
+
+  .nearby-stop-card {
+    padding: 14px;
+  }
+
+  .svc-view-btn {
+    padding: 9px 14px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+
+  .trip-track-btn {
+    padding: 9px 14px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+
+  .trip-loc-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .panel-header {
+    padding: 14px 18px 12px;
+  }
+
+  .panel-body {
+    padding: 14px 16px;
+  }
+
+  /* ── Alerts banner: smaller on mobile ── */
+  .alerts-banner-inner {
+    padding: 6px 12px;
+    min-height: 32px;
   }
 }
 
@@ -2474,7 +2714,8 @@ mark.suggestion-match {
 .trip-dep-card,
 .trip-stop-card,
 .svc-alert-card,
-.svc-toolbar {
+.svc-toolbar,
+.bottom-nav {
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
@@ -2561,4 +2802,20 @@ body.light-mode .alerts-banner-close:hover {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+}
+
+/* ===================================================
+   Light mode — mobile component overrides
+   =================================================== */
+
+body.light-mode .bottom-nav {
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+}
+
+body.light-mode .mobile-sheet-backdrop {
+  background: rgba(0, 0, 0, 0.32);
+}
+
+body.light-mode .sidebar-wrapper {
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.18);
 }
