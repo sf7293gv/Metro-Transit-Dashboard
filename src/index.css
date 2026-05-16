@@ -968,6 +968,71 @@ html, body, #root {
   opacity: 1;
 }
 
+/* ── Star toggle button (route rows + SearchPanel footer) ── */
+
+.star-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.star-btn:hover {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.star-btn.starred {
+  color: #f59e0b;
+}
+
+/* ── Favorites section inside RoutesPanel ── */
+
+.routes-fav-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.routes-fav-empty {
+  padding: 10px 18px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── nav tab badge (Routes count) ── */
+
+.nav-tab-text {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.nav-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  border-radius: 7px;
+  line-height: 1;
+}
+
 .routes-empty {
   padding: 32px 18px;
   text-align: center;

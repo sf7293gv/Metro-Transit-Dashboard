@@ -11,11 +11,25 @@ function WarnIcon() {
   )
 }
 
+function StarIcon({ filled }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 20 20"
+      fill={filled ? '#f59e0b' : 'none'}
+      stroke={filled ? '#f59e0b' : 'currentColor'}
+      strokeWidth="1.5" strokeLinejoin="round"
+    >
+      <path d="M10 2l2.3 4.6 5.1.75-3.7 3.6.87 5.1L10 13.6l-4.57 2.46.87-5.1L2.6 7.36l5.1-.75L10 2z" />
+    </svg>
+  )
+}
+
 function SearchPanel({
   routeInput, onRouteChange, onSubmit,
   loading, error, activeRoute, busCount,
   countdown, routeHistory, onHistorySelect,
+  favorites = [], onToggleFavorite,
 }) {
+  const isFav = favorites.includes(String(activeRoute))
   const countdownPct = (countdown / 30) * 100
 
   return (
@@ -84,9 +98,16 @@ function SearchPanel({
               {' · '}
               {loading ? 'refreshing…' : `${busCount > 0 ? `${busCount} in service` : 'no buses'}`}
             </span>
-            {!loading && (
-              <span className="countdown-label">{countdown}s</span>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                className={`star-btn${isFav ? ' starred' : ''}`}
+                onClick={() => onToggleFavorite?.(String(activeRoute))}
+                title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <StarIcon filled={isFav} />
+              </button>
+              {!loading && <span className="countdown-label">{countdown}s</span>}
+            </div>
           </div>
           <div className="countdown-track">
             <div

@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 
 const AGENCY_NAMES = {
-  0: 'Metro Transit',
-  2: 'Met Council',
-  3: 'Minnesota Valley',
-  4: 'Maple Grove',
-  5: 'Plymouth',
-  6: 'SouthWest Transit',
+  0:  'Metro Transit',
+  2:  'Met Council',
+  3:  'Minnesota Valley',
+  4:  'Maple Grove',
+  5:  'Plymouth',
+  6:  'SouthWest Transit',
   10: 'Airport (MAC)',
   11: 'University of Minnesota',
 }
@@ -24,11 +24,47 @@ function SearchIcon() {
   )
 }
 
-function RoutesPanel({ onTrackRoute }) {
-  const [routes, setRoutes]   = useState([])
+function StarIcon({ filled }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 20 20"
+      fill={filled ? '#f59e0b' : 'none'}
+      stroke={filled ? '#f59e0b' : 'currentColor'}
+      strokeWidth="1.5" strokeLinejoin="round"
+    >
+      <path d="M10 2l2.3 4.6 5.1.75-3.7 3.6.87 5.1L10 13.6l-4.57 2.46.87-5.1L2.6 7.36l5.1-.75L10 2z" />
+    </svg>
+  )
+}
+
+function RouteRow({ route, isFavorite, onTrack, onToggle }) {
+  return (
+    <div
+      className="route-item"
+      onClick={() => onTrack(route.route_id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onTrack(route.route_id)}
+    >
+      <span className="route-item-label">{route.route_label}</span>
+      <span className="route-item-id">{route.route_id}</span>
+      <span className="route-item-track">Track</span>
+      <button
+        className={`star-btn${isFavorite ? ' starred' : ''}`}
+        onClick={e => { e.stopPropagation(); onToggle(route.route_id) }}
+        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        aria-label={isFavorite ? `Unstar route ${route.route_id}` : `Star route ${route.route_id}`}
+      >
+        <StarIcon filled={isFavorite} />
+      </button>
+    </div>
+  )
+}
+
+function RoutesPanel({ onTrackRoute, favorites = [], onToggleFavorite }) {
+  const [routes,  setRoutes]  = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
-  const [query, setQuery]     = useState('')
+  const [error,   setError]   = useState(null)
+  const [query,   setQuery]   = useState('')
 
   useEffect(() => {
     fetch('https://svc.metrotransit.org/nextrip/routes')
@@ -37,6 +73,8 @@ function RoutesPanel({ onTrackRoute }) {
       .catch(() => setError('Could not load routes.'))
       .finally(() => setLoading(false))
   }, [])
+
+  const favSet = useMemo(() => new Set(favorites.map(String)), [favorites])
 
   const filtered = useMemo(() => {
     if (!query.trim()) return routes
@@ -47,16 +85,23 @@ function RoutesPanel({ onTrackRoute }) {
     )
   }, [routes, query])
 
-  // Group by agency
+  // Favorited routes from the full list (preserving list order)
+  const favRoutes = useMemo(
+    () => filtered.filter(r => favSet.has(String(r.route_id))),
+    [filtered, favSet]
+  )
+
+  // Non-favorited routes grouped by agency
   const groups = useMemo(() => {
     const map = new Map()
     for (const r of filtered) {
+      if (favSet.has(String(r.route_id))) continue  // already shown above
       const name = AGENCY_NAMES[r.agency_id] ?? `Agency ${r.agency_id}`
       if (!map.has(name)) map.set(name, [])
       map.get(name).push(r)
     }
     return map
-  }, [filtered])
+  }, [filtered, favSet])
 
   return (
     <div className="search-panel" style={{ overflow: 'hidden' }}>
@@ -99,25 +144,45 @@ function RoutesPanel({ onTrackRoute }) {
           <div className="routes-empty">No routes match "{query}"</div>
         )}
 
-        {!loading && !error && [...groups.entries()].map(([agencyName, agencyRoutes]) => (
-          <div key={agencyName}>
-            <div className="routes-group-label">{agencyName}</div>
-            {agencyRoutes.map(route => (
-              <div
-                key={route.route_id}
-                className="route-item"
-                onClick={() => onTrackRoute(route.route_id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => e.key === 'Enter' && onTrackRoute(route.route_id)}
-              >
-                <span className="route-item-label">{route.route_label}</span>
-                <span className="route-item-id">{route.route_id}</span>
-                <span className="route-item-track">Track</span>
+        {!loading && !error && filtered.length > 0 && (
+          <>
+            {/* ── Favorites section ── */}
+            <div className="routes-fav-section">
+              <div className="routes-group-label">Starred Routes</div>
+              {favRoutes.length === 0 ? (
+                <div className="routes-fav-empty">
+                  Star a route to save it here
+                </div>
+              ) : (
+                favRoutes.map(route => (
+                  <RouteRow
+                    key={route.route_id}
+                    route={route}
+                    isFavorite={true}
+                    onTrack={onTrackRoute}
+                    onToggle={onToggleFavorite}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* ── All routes by agency ── */}
+            {[...groups.entries()].map(([agencyName, agencyRoutes]) => (
+              <div key={agencyName}>
+                <div className="routes-group-label">{agencyName}</div>
+                {agencyRoutes.map(route => (
+                  <RouteRow
+                    key={route.route_id}
+                    route={route}
+                    isFavorite={false}
+                    onTrack={onTrackRoute}
+                    onToggle={onToggleFavorite}
+                  />
+                ))}
               </div>
             ))}
-          </div>
-        ))}
+          </>
+        )}
       </div>
     </div>
   )

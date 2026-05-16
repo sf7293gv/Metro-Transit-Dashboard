@@ -67,7 +67,7 @@ const PANELS = [
   { id: 'nearby',  label: 'Nearby',   Icon: NearbyIcon },
 ]
 
-function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect }) {
+function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite }) {
   return (
     <div className={`sidebar-wrapper${open ? '' : ' collapsed'}`}>
       <div className="sidebar">
@@ -80,7 +80,12 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
               onClick={() => onPanelChange(id)}
             >
               <Icon />
-              {label}
+              <span className="nav-tab-text">
+                {label}
+                {id === 'routes' && favorites.length > 0 && (
+                  <span className="nav-tab-badge">{favorites.length}</span>
+                )}
+              </span>
             </button>
           ))}
           <button
@@ -104,7 +109,7 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
             <MyCommutePanel />
           </div>
           <div className={`panel-slot${activePanel === 'routes'  ? ' panel-active' : ''}`}>
-            <RoutesPanel onTrackRoute={onTrackRoute} />
+            <RoutesPanel onTrackRoute={onTrackRoute} favorites={favorites} onToggleFavorite={onToggleFavorite} />
           </div>
           <div className={`panel-slot${activePanel === 'nearby'  ? ' panel-active' : ''}`}>
             <NearbyStopsPanel onStopSelect={onStopSelect} />

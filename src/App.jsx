@@ -7,10 +7,14 @@ import BusDetailPanel from './components/BusDetailPanel.jsx'
 import './index.css'
 
 const REFRESH_INTERVAL = 30000
-const HISTORY_KEY = 'mt-route-history'
+const HISTORY_KEY    = 'mt-route-history'
+const FAVORITES_KEY  = 'mt-favorites'
 
 function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [] } catch { return [] }
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY))   ?? [] } catch { return [] }
+}
+function loadFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAVORITES_KEY)) ?? [] } catch { return [] }
 }
 
 // ─── Stop coordinate resolution ───────────────────────────────────────────────
@@ -105,6 +109,7 @@ function App() {
   const [loading, setLoading]           = useState(false)
   const [countdown, setCountdown]       = useState(0)
   const [routeHistory, setRouteHistory] = useState(loadHistory)
+  const [favorites,    setFavorites]    = useState(loadFavorites)
 
   // Bus detail panel
   const [selectedBus, setSelectedBus]   = useState(null)
@@ -148,6 +153,15 @@ function App() {
     const fresh = buses.find(b => b.trip_id === selectedBus.trip_id)
     if (fresh) setSelectedBus(fresh)
   }, [buses]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleFavorite(routeId) {
+    const id = String(routeId)
+    setFavorites(prev => {
+      const next = prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
+      try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
 
   function addToHistory(val) {
     setRouteHistory(prev => {
@@ -225,6 +239,7 @@ function App() {
     activeRoute, busCount: buses.length,
     countdown, routeHistory,
     onHistorySelect: handleHistorySelect,
+    favorites, onToggleFavorite: toggleFavorite,
   }
 
   return (
@@ -247,6 +262,8 @@ function App() {
           onTrackRoute={handleTrackRoute}
           stopId={selectedStopId}
           onStopSelect={handleStopSelect}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
         />
         <div className="map-area">
           {!sidebarOpen && (
