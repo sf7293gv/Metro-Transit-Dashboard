@@ -2041,3 +2041,78 @@ html, body, #root {
 .sidebar-backdrop {
   display: none;
 }
+
+/* ===================================================
+   Stop Finder — Search Area + Name Suggestions
+   =================================================== */
+
+.stop-finder-search-area {
+  padding: 12px 14px 0;
+  flex-shrink: 0;
+}
+
+.stop-index-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 6px 2px 0;
+}
+
+.stop-suggestions {
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.stop-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  transition: background 0.12s;
+}
+
+.stop-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.stop-suggestion-item:hover,
+.stop-suggestion-item.active {
+  background: var(--accent-light);
+}
+
+.stop-suggestion-name {
+  font-size: 12.5px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+mark.suggestion-match {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.stop-suggestion-code {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-family: monospace;
+  letter-spacing: 0.02em;
+}
