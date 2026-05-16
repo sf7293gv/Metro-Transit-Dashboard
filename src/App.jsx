@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import AlertsBanner from './components/AlertsBanner.jsx'
 import Header from './components/Header.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import MapView from './components/MapView.jsx'
@@ -221,6 +222,7 @@ function App() {
 
   return (
     <div className="app">
+      <AlertsBanner />
       <Header isLive={isLive} />
       <div className="app-body">
         {sidebarOpen && (
