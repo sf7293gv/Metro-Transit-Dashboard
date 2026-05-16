@@ -3,6 +3,7 @@ import StopFinderPanel from './panels/StopFinderPanel.jsx'
 import MyCommutePanel from './panels/MyCommutePanel.jsx'
 import RoutesPanel from './panels/RoutesPanel.jsx'
 import NearbyStopsPanel from './panels/NearbyStopsPanel.jsx'
+import ServiceStatusPanel from './panels/ServiceStatusPanel.jsx'
 
 function MapIcon() {
   return (
@@ -41,6 +42,15 @@ function ListIcon() {
   )
 }
 
+function StatusIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 2L2 17h16L10 2z" />
+      <path d="M10 8v3.5M10 14.5h.01" />
+    </svg>
+  )
+}
+
 function NearbyIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -65,6 +75,7 @@ const PANELS = [
   { id: 'commute', label: 'Commute',  Icon: StarIcon   },
   { id: 'routes',  label: 'Routes',   Icon: ListIcon   },
   { id: 'nearby',  label: 'Nearby',   Icon: NearbyIcon },
+  { id: 'status',  label: 'Status',   Icon: StatusIcon },
 ]
 
 function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite }) {
@@ -113,6 +124,9 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
           </div>
           <div className={`panel-slot${activePanel === 'nearby'  ? ' panel-active' : ''}`}>
             <NearbyStopsPanel onStopSelect={onStopSelect} />
+          </div>
+          <div className={`panel-slot${activePanel === 'status'  ? ' panel-active' : ''}`}>
+            <ServiceStatusPanel onStopSelect={onStopSelect} />
           </div>
         </div>
 
