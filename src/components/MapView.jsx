@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, Marker, Tooltip } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import { useEffect } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -41,9 +42,19 @@ const stopIcon = L.divIcon({
   iconAnchor: [6, 6],
 })
 
+// ── Map controller — flies to a stop when selected from outside the map ───────
+
+function MapController({ center }) {
+  const map = useMap()
+  useEffect(() => {
+    if (center) map.flyTo([center.lat, center.lng], 16, { animate: true, duration: 0.8 })
+  }, [center, map])
+  return null
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect }) {
+function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect, mapCenter }) {
   return (
     <MapContainer
       center={TWIN_CITIES}
@@ -51,6 +62,7 @@ function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect }
       className="map-container"
       zoomControl={true}
     >
+      <MapController center={mapCenter} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"

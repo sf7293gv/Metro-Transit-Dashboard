@@ -2,6 +2,7 @@ import SearchPanel from './SearchPanel.jsx'
 import StopFinderPanel from './panels/StopFinderPanel.jsx'
 import MyCommutePanel from './panels/MyCommutePanel.jsx'
 import RoutesPanel from './panels/RoutesPanel.jsx'
+import NearbyStopsPanel from './panels/NearbyStopsPanel.jsx'
 
 function MapIcon() {
   return (
@@ -40,6 +41,16 @@ function ListIcon() {
   )
 }
 
+function NearbyIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="10" r="7" />
+      <circle cx="10" cy="10" r="2.5" fill="currentColor" stroke="none" />
+      <path d="M10 3v1.5M10 15.5V17M3 10h1.5M15.5 10H17" />
+    </svg>
+  )
+}
+
 function ChevronLeftIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -49,13 +60,14 @@ function ChevronLeftIcon() {
 }
 
 const PANELS = [
-  { id: 'map',     label: 'Live Map', Icon: MapIcon  },
-  { id: 'stops',   label: 'Stops',    Icon: BusIcon  },
-  { id: 'commute', label: 'Commute',  Icon: StarIcon },
-  { id: 'routes',  label: 'Routes',   Icon: ListIcon },
+  { id: 'map',     label: 'Live Map', Icon: MapIcon    },
+  { id: 'stops',   label: 'Stops',    Icon: BusIcon    },
+  { id: 'commute', label: 'Commute',  Icon: StarIcon   },
+  { id: 'routes',  label: 'Routes',   Icon: ListIcon   },
+  { id: 'nearby',  label: 'Nearby',   Icon: NearbyIcon },
 ]
 
-function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId }) {
+function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect }) {
   return (
     <div className={`sidebar-wrapper${open ? '' : ' collapsed'}`}>
       <div className="sidebar">
@@ -93,6 +105,9 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
           </div>
           <div className={`panel-slot${activePanel === 'routes'  ? ' panel-active' : ''}`}>
             <RoutesPanel onTrackRoute={onTrackRoute} />
+          </div>
+          <div className={`panel-slot${activePanel === 'nearby'  ? ' panel-active' : ''}`}>
+            <NearbyStopsPanel onStopSelect={onStopSelect} />
           </div>
         </div>
 

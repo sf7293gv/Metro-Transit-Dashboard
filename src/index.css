@@ -1301,6 +1301,202 @@ html, body, #root {
 .leaflet-attribution-flag { display: none !important; }
 
 /* ===================================================
+   Nearby Stops Panel
+   =================================================== */
+
+/* idle CTA */
+.nearby-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.nearby-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* locating spinner row */
+.nearby-state-msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+
+/* progress bar */
+.nearby-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nearby-progress-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.nearby-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.nearby-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* done header */
+.nearby-done-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nearby-done-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.nearby-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.nearby-refresh-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* stop card */
+.nearby-stop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 13px;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.nearby-stop-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(0, 83, 160, 0.3);
+}
+
+.nearby-stop-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nearby-stop-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+  line-height: 1.3;
+}
+
+.nearby-stop-dist {
+  font-size: 11.5px;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* route badges row */
+.nearby-stop-routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.nearby-route-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  background: rgba(0, 83, 160, 0.2);
+  color: #60a5fa;
+  border-radius: 3px;
+  line-height: 1.6;
+}
+
+.nearby-route-more {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+/* departure preview rows */
+.nearby-deps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 1px;
+}
+
+.nearby-dep {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.nearby-dep-route {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+  min-width: 26px;
+}
+
+.nearby-dep-dest {
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+
+.nearby-dep-time {
+  color: var(--success);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 11.5px;
+}
+
+.nearby-no-dep {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ===================================================
    Service Alerts Banner
    =================================================== */
 

@@ -109,8 +109,11 @@ function App() {
   // Bus detail panel
   const [selectedBus, setSelectedBus]   = useState(null)
 
-  // Stop Finder panel — driven by map marker clicks
+  // Stop Finder panel — driven by map marker clicks or Nearby Stops selection
   const [selectedStopId, setSelectedStopId] = useState(null)
+
+  // Map fly-to — updated whenever the user selects a stop from outside the map
+  const [mapCenter, setMapCenter] = useState(null)
 
   const fetchIntervalRef     = useRef(null)
   const countdownIntervalRef = useRef(null)
@@ -178,6 +181,10 @@ function App() {
     setSelectedStopId(stop.stop_id)
     setActivePanel('stops')
     setSidebarOpen(true)
+    if (stop.latitude != null && stop.longitude != null) {
+      // ts forces the effect to re-fire even when the same stop is selected twice
+      setMapCenter({ lat: stop.latitude, lng: stop.longitude, ts: Date.now() })
+    }
   }
 
   function handleTrackRoute(routeId) {
@@ -239,6 +246,7 @@ function App() {
           liveMapProps={liveMapProps}
           onTrackRoute={handleTrackRoute}
           stopId={selectedStopId}
+          onStopSelect={handleStopSelect}
         />
         <div className="map-area">
           {!sidebarOpen && (
@@ -259,6 +267,7 @@ function App() {
             onBusSelect={setSelectedBus}
             selectedBusId={selectedBus?.trip_id}
             onStopSelect={handleStopSelect}
+            mapCenter={mapCenter}
           />
           <BusDetailPanel
             bus={selectedBus}
