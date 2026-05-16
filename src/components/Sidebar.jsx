@@ -55,7 +55,7 @@ const PANELS = [
   { id: 'routes',  label: 'Routes',   Icon: ListIcon },
 ]
 
-function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute }) {
+function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId }) {
   return (
     <div className={`sidebar-wrapper${open ? '' : ' collapsed'}`}>
       <div className="sidebar">
@@ -86,7 +86,7 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
             <SearchPanel {...liveMapProps} />
           </div>
           <div className={`panel-slot${activePanel === 'stops'   ? ' panel-active' : ''}`}>
-            <StopFinderPanel />
+            <StopFinderPanel stopId={stopId} />
           </div>
           <div className={`panel-slot${activePanel === 'commute' ? ' panel-active' : ''}`}>
             <MyCommutePanel />

@@ -1,9 +1,11 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Tooltip } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 const TWIN_CITIES = [44.96, -93.2]
 const ZOOM = 11
+
+// ── Bus icon ──────────────────────────────────────────────────────────────────
 
 const busSvg = `
   <svg viewBox="0 0 22 18" width="20" height="16" xmlns="http://www.w3.org/2000/svg">
@@ -18,15 +20,30 @@ const busSvg = `
   </svg>
 `
 
-const busIcon = L.divIcon({
-  html: `<div class="bus-marker">${busSvg}</div>`,
+function makeBusIcon(selected = false) {
+  return L.divIcon({
+    html: `<div class="bus-marker${selected ? ' selected' : ''}">${busSvg}</div>`,
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  })
+}
+
+const defaultIcon  = makeBusIcon(false)
+const selectedIcon = makeBusIcon(true)
+
+// ── Stop icon ─────────────────────────────────────────────────────────────────
+
+const stopIcon = L.divIcon({
+  html: '<div class="stop-marker"></div>',
   className: '',
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-  popupAnchor: [0, -22],
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
 })
 
-function MapView({ buses }) {
+// ── Component ─────────────────────────────────────────────────────────────────
+
+function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect }) {
   return (
     <MapContainer
       center={TWIN_CITIES}
@@ -39,18 +56,30 @@ function MapView({ buses }) {
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         maxZoom={19}
       />
+
+      {/* Stop markers — rendered below buses so buses appear on top */}
+      {stops.map(stop => (
+        <Marker
+          key={stop.stop_id}
+          position={[stop.latitude, stop.longitude]}
+          icon={stopIcon}
+          zIndexOffset={-100}
+          eventHandlers={{ click: () => onStopSelect?.(stop) }}
+        >
+          <Tooltip direction="top" offset={[0, -8]} opacity={1} className="stop-tooltip">
+            {stop.description}
+          </Tooltip>
+        </Marker>
+      ))}
+
+      {/* Bus markers */}
       {buses.map(bus => (
         <Marker
           key={bus.trip_id}
           position={[bus.latitude, bus.longitude]}
-          icon={busIcon}
-        >
-          <Popup>
-            <div className="popup-route">Route {bus.route_id}</div>
-            <div className="popup-row">Direction: <strong>{bus.direction_text || bus.direction || 'Unknown'}</strong></div>
-            <div className="popup-row">Terminal: <strong>{bus.terminal || 'Unknown'}</strong></div>
-          </Popup>
-        </Marker>
+          icon={bus.trip_id === selectedBusId ? selectedIcon : defaultIcon}
+          eventHandlers={{ click: () => onBusSelect(bus) }}
+        />
       ))}
     </MapContainer>
   )

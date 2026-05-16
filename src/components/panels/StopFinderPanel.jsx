@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 function WarnIcon() {
   return (
@@ -26,14 +26,15 @@ function DepartureItem({ dep }) {
   )
 }
 
-function StopFinderPanel() {
-  const [input, setInput]   = useState('')
-  const [data, setData]     = useState(null)
+function StopFinderPanel({ stopId }) {
+  const [input, setInput]     = useState('')
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState(null)
+  const [error, setError]     = useState(null)
 
-  async function fetchStop() {
-    const id = input.trim()
+  // explicitId lets the useEffect call fetchStop without relying on stale `input` state
+  async function fetchStop(explicitId) {
+    const id = (explicitId != null ? String(explicitId) : input).trim()
     if (!id) { setError('Enter a stop ID.'); return }
     if (isNaN(Number(id))) { setError('Stop IDs are numeric (e.g. 56913).'); return }
 
@@ -52,6 +53,13 @@ function StopFinderPanel() {
       setLoading(false)
     }
   }
+
+  // Triggered by map marker click — update input field and auto-fetch
+  useEffect(() => {
+    if (stopId == null) return
+    setInput(String(stopId))
+    fetchStop(stopId)
+  }, [stopId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop        = data?.stops?.[0]
   const alerts      = data?.alerts ?? []
