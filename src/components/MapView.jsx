@@ -6,6 +6,9 @@ import 'leaflet/dist/leaflet.css'
 const TWIN_CITIES = [44.96, -93.2]
 const ZOOM = 11
 
+const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+
 // ── Bus icon ──────────────────────────────────────────────────────────────────
 
 const busSvg = `
@@ -88,7 +91,8 @@ function TripController({ points }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect, mapCenter, tripPoints }) {
+function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect, mapCenter, tripPoints, theme }) {
+  const tileUrl = theme === 'light' ? TILE_LIGHT : TILE_DARK
   return (
     <MapContainer
       center={TWIN_CITIES}
@@ -99,8 +103,9 @@ function MapView({ buses, stops = [], onBusSelect, selectedBusId, onStopSelect, 
       <MapController center={mapCenter} />
       <TripController points={tripPoints} />
       <TileLayer
+        key={tileUrl}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        url={tileUrl}
         maxZoom={19}
       />
 

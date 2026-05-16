@@ -9,6 +9,18 @@ import './index.css'
 const REFRESH_INTERVAL = 30000
 const HISTORY_KEY    = 'mt-route-history'
 const FAVORITES_KEY  = 'mt-favorites'
+const THEME_KEY      = 'mt-theme'
+
+function loadTheme() {
+  try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark' } catch { return 'dark' }
+}
+
+// Apply saved theme before first React render to avoid flash-of-wrong-theme
+;(function applyInitialTheme() {
+  try {
+    if (localStorage.getItem(THEME_KEY) === 'light') document.body.classList.add('light-mode')
+  } catch {}
+})()
 
 function loadHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY))   ?? [] } catch { return [] }
@@ -96,6 +108,16 @@ async function fetchStops(routeId) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function App() {
+  // Theme
+  const [theme, setTheme] = useState(loadTheme)
+
+  useEffect(() => {
+    document.body.classList.toggle('light-mode', theme === 'light')
+    try { localStorage.setItem(THEME_KEY, theme) } catch {}
+  }, [theme])
+
+  function toggleTheme() { setTheme(t => t === 'dark' ? 'light' : 'dark') }
+
   // Sidebar navigation
   const [sidebarOpen, setSidebarOpen]   = useState(true)
   const [activePanel, setActivePanel]   = useState('map')
@@ -252,7 +274,7 @@ function App() {
   return (
     <div className="app">
       <AlertsBanner />
-      <Header isLive={isLive} />
+      <Header isLive={isLive} theme={theme} onToggleTheme={toggleTheme} />
       <div className="app-body">
         {sidebarOpen && (
           <div
@@ -294,6 +316,7 @@ function App() {
             onStopSelect={handleStopSelect}
             mapCenter={mapCenter}
             tripPoints={tripPoints}
+            theme={theme}
           />
           <BusDetailPanel
             bus={selectedBus}
