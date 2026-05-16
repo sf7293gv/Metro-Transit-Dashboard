@@ -28,7 +28,7 @@
   --radius-md:       10px;
   --radius-lg:       14px;
   --header-height:   64px;
-  --sidebar-width:   320px;
+  --sidebar-width:   380px;
   --font:            'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -173,13 +173,68 @@ html, body, #root {
   width: 0;
 }
 
+/* Suppress animation while the user is dragging the resize handle */
+.sidebar-wrapper.resizing {
+  transition: none !important;
+  user-select: none;
+}
+
 .sidebar {
-  width: var(--sidebar-width);
+  width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
+}
+
+/* ── Sidebar resize handle ──────────────────────────────── */
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* hover / drag highlight line */
+.sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle.is-dragging::after {
+  background: rgba(0, 83, 160, 0.55);
+}
+
+/* three-dot grip indicator */
+.sidebar-resize-grip {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  box-shadow: 0 -7px 0 var(--text-muted), 0 7px 0 var(--text-muted);
+  opacity: 0;
+  transition: opacity 0.15s;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-resize-handle:hover .sidebar-resize-grip,
+.sidebar-resize-handle.is-dragging .sidebar-resize-grip {
+  opacity: 0.55;
 }
 
 /* Nav tab bar */
@@ -1849,6 +1904,11 @@ html, body, #root {
     background: rgba(0, 0, 0, 0.55);
     z-index: 899;
   }
+
+  /* No resize handle on mobile — drawer is fixed-width */
+  .sidebar-resize-handle {
+    display: none;
+  }
 }
 
 /* ===================================================
@@ -2115,4 +2175,252 @@ mark.suggestion-match {
   flex-shrink: 0;
   font-family: monospace;
   letter-spacing: 0.02em;
+}
+
+/* ===================================================
+   Trip Planner Panel
+   =================================================== */
+
+.trip-form-area {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.trip-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A / B dot labels */
+.trip-field-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: white;
+  flex-shrink: 0;
+  font-family: var(--font);
+}
+
+.trip-dot-from { background: var(--accent); }
+.trip-dot-to   { background: #e05a5a; }
+
+/* connector line between A and B dots */
+.trip-connector {
+  width: 1px;
+  height: 6px;
+  background: var(--border);
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+/* GPS location button */
+.trip-loc-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.trip-loc-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-color: rgba(0, 83, 160, 0.35);
+}
+
+.trip-loc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* scan progress */
+.trip-scan-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trip-scan-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trip-scan-label {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.trip-scan-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.trip-prog-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.trip-prog-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.35s ease;
+}
+
+.trip-scan-note {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* empty state */
+.trip-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 20px 28px;
+  text-align: center;
+}
+
+.trip-empty-icon {
+  color: var(--text-muted);
+  opacity: 0.45;
+  margin-bottom: 2px;
+}
+
+.trip-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.trip-empty-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 210px;
+}
+
+/* origin / destination stop cards */
+.trip-stop-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.trip-stop-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.trip-stop-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.trip-stop-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* departure suggestion cards */
+.trip-dep-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s;
+}
+
+.trip-dep-card:hover {
+  border-color: rgba(0, 83, 160, 0.35);
+}
+
+.trip-dep-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trip-dep-dest {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trip-dep-time {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.trip-dep-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.trip-dep-walk {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.trip-track-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid rgba(0, 83, 160, 0.3);
+  border-radius: 4px;
+  padding: 3px 9px;
+  cursor: pointer;
+  font-family: var(--font);
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.trip-track-btn:hover {
+  background: var(--accent-light);
+  border-color: rgba(0, 83, 160, 0.5);
 }

@@ -1,9 +1,28 @@
+import { useState, useRef, useEffect } from 'react'
 import SearchPanel from './SearchPanel.jsx'
 import StopFinderPanel from './panels/StopFinderPanel.jsx'
 import MyCommutePanel from './panels/MyCommutePanel.jsx'
 import RoutesPanel from './panels/RoutesPanel.jsx'
 import NearbyStopsPanel from './panels/NearbyStopsPanel.jsx'
 import ServiceStatusPanel from './panels/ServiceStatusPanel.jsx'
+import TripPlannerPanel from './panels/TripPlannerPanel.jsx'
+
+// ── Resize constants ──────────────────────────────────────────────────────────
+
+const SIDEBAR_WIDTH_KEY = 'mt-sidebar-width'
+const MIN_WIDTH     = 280
+const MAX_WIDTH     = 600
+const DEFAULT_WIDTH = 380
+
+function loadSavedWidth() {
+  try {
+    const n = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY), 10)
+    if (n >= MIN_WIDTH && n <= MAX_WIDTH) return n
+  } catch {}
+  return DEFAULT_WIDTH
+}
+
+// ── Nav icons ─────────────────────────────────────────────────────────────────
 
 function MapIcon() {
   return (
@@ -61,6 +80,16 @@ function NearbyIcon() {
   )
 }
 
+function DirectionsIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="5" cy="5" r="2.5" />
+      <circle cx="15" cy="15" r="2.5" />
+      <path d="M5 7.5 C5 12 15 8 15 12.5" strokeDasharray="2.5 2" />
+    </svg>
+  )
+}
+
 function ChevronLeftIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -70,17 +99,72 @@ function ChevronLeftIcon() {
 }
 
 const PANELS = [
-  { id: 'map',     label: 'Live Map', Icon: MapIcon    },
-  { id: 'stops',   label: 'Stops',    Icon: BusIcon    },
-  { id: 'commute', label: 'Commute',  Icon: StarIcon   },
-  { id: 'routes',  label: 'Routes',   Icon: ListIcon   },
-  { id: 'nearby',  label: 'Nearby',   Icon: NearbyIcon },
-  { id: 'status',  label: 'Status',   Icon: StatusIcon },
+  { id: 'map',     label: 'Live Map', Icon: MapIcon        },
+  { id: 'stops',   label: 'Stops',    Icon: BusIcon        },
+  { id: 'planner', label: 'Plan',     Icon: DirectionsIcon },
+  { id: 'commute', label: 'Commute',  Icon: StarIcon       },
+  { id: 'routes',  label: 'Routes',   Icon: ListIcon       },
+  { id: 'nearby',  label: 'Nearby',   Icon: NearbyIcon     },
+  { id: 'status',  label: 'Status',   Icon: StatusIcon     },
 ]
 
-function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite }) {
+// ── Component ─────────────────────────────────────────────────────────────────
+
+function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite, onTripUpdate }) {
+  const [sidebarWidth, setSidebarWidth] = useState(loadSavedWidth)
+
+  const wrapperRef  = useRef(null)
+  const isDragging  = useRef(false)
+  const dragStart   = useRef(null)   // { x, width }
+  const handleRef   = useRef(null)
+
+  // Sync DOM width whenever state or open/collapsed changes.
+  // Skipped during active drag so direct DOM updates aren't overwritten.
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el || isDragging.current) return
+    el.style.width = open ? `${sidebarWidth}px` : '0px'
+  }, [sidebarWidth, open])
+
+  function handleResizeStart(e) {
+    if (e.button !== 0) return                    // left-click only
+    if (window.innerWidth <= 768) return          // desktop only
+    e.preventDefault()
+
+    const el = wrapperRef.current
+    isDragging.current = true
+    dragStart.current  = { x: e.clientX, width: sidebarWidth }
+
+    el?.classList.add('resizing')
+    handleRef.current?.classList.add('is-dragging')
+
+    function onMove(ev) {
+      if (!isDragging.current) return
+      const dx       = ev.clientX - dragStart.current.x
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragStart.current.width + dx))
+      if (wrapperRef.current) wrapperRef.current.style.width = `${newWidth}px`
+    }
+
+    function onUp() {
+      isDragging.current = false
+
+      const finalWidth = parseInt(wrapperRef.current?.style.width, 10) || DEFAULT_WIDTH
+      setSidebarWidth(finalWidth)
+      try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(finalWidth)) } catch {}
+
+      el?.classList.remove('resizing')
+      handleRef.current?.classList.remove('is-dragging')
+
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup',   onUp)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup',   onUp)
+  }
+
   return (
-    <div className={`sidebar-wrapper${open ? '' : ' collapsed'}`}>
+    <div ref={wrapperRef} className={`sidebar-wrapper${open ? '' : ' collapsed'}`}>
       <div className="sidebar">
 
         <nav className="sidebar-nav">
@@ -116,6 +200,9 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
           <div className={`panel-slot${activePanel === 'stops'   ? ' panel-active' : ''}`}>
             <StopFinderPanel stopId={stopId} />
           </div>
+          <div className={`panel-slot${activePanel === 'planner' ? ' panel-active' : ''}`}>
+            <TripPlannerPanel onTripUpdate={onTripUpdate} onTrackRoute={onTrackRoute} />
+          </div>
           <div className={`panel-slot${activePanel === 'commute' ? ' panel-active' : ''}`}>
             <MyCommutePanel />
           </div>
@@ -130,6 +217,16 @@ function Sidebar({ open, activePanel, onPanelChange, onToggle, liveMapProps, onT
           </div>
         </div>
 
+      </div>
+
+      {/* Drag handle — sits at the right edge of the wrapper, desktop only */}
+      <div
+        ref={handleRef}
+        className="sidebar-resize-handle"
+        onMouseDown={handleResizeStart}
+        aria-hidden="true"
+      >
+        <div className="sidebar-resize-grip" />
       </div>
     </div>
   )

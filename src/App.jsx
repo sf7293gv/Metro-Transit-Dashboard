@@ -120,6 +120,9 @@ function App() {
   // Map fly-to — updated whenever the user selects a stop from outside the map
   const [mapCenter, setMapCenter] = useState(null)
 
+  // Trip Planner — from/to pin markers shown on the map
+  const [tripPoints, setTripPoints] = useState(null)
+
   const fetchIntervalRef     = useRef(null)
   const countdownIntervalRef = useRef(null)
 
@@ -201,6 +204,10 @@ function App() {
     }
   }
 
+  function handleTripUpdate(points) {
+    setTripPoints(points)
+  }
+
   function handleTrackRoute(routeId) {
     setRouteInput(String(routeId))
     setError(null)
@@ -264,6 +271,7 @@ function App() {
           onStopSelect={handleStopSelect}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
+          onTripUpdate={handleTripUpdate}
         />
         <div className="map-area">
           {!sidebarOpen && (
@@ -285,6 +293,7 @@ function App() {
             selectedBusId={selectedBus?.trip_id}
             onStopSelect={handleStopSelect}
             mapCenter={mapCenter}
+            tripPoints={tripPoints}
           />
           <BusDetailPanel
             bus={selectedBus}
