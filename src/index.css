@@ -1244,6 +1244,135 @@ html, body, #root {
   transform: scale(0.975);
 }
 
+/* ── Bus detail: upcoming stops timeline ── */
+
+.trip-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+.trip-stops-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.trip-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.trip-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.trip-progress {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-stop-row {
+  display: flex;
+  gap: 10px;
+}
+
+/* vertical connector */
+.trip-stop-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 14px;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+
+.trip-stop-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.trip-stop-dot-next {
+  width: 9px;
+  height: 9px;
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 83, 160, 0.3);
+}
+
+.trip-stop-line {
+  width: 1.5px;
+  flex: 1;
+  min-height: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 3px 0;
+}
+
+/* stop info row */
+.trip-stop-info {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 16px;
+}
+
+.trip-stop-row:last-child .trip-stop-info {
+  padding-bottom: 4px;
+}
+
+.trip-stop-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  flex: 1;
+  min-width: 0;
+}
+
+.trip-stop-row.trip-stop-next .trip-stop-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.trip-stop-time-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.trip-stop-time {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trip-stop-row.trip-stop-next .trip-stop-time {
+  color: var(--success);
+  font-size: 12.5px;
+}
+
 /* Selected marker highlight */
 .bus-marker.selected {
   border-width: 3px;
