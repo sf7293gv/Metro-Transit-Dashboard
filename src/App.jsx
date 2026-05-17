@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar.jsx'
 import MapView from './components/MapView.jsx'
 import BusDetailPanel from './components/BusDetailPanel.jsx'
 import BottomNav from './components/BottomNav.jsx'
+import MobileMapSearch from './components/MobileMapSearch.jsx'
 import './index.css'
 
 const REFRESH_INTERVAL = 30000
@@ -201,12 +202,13 @@ function App() {
     const val = parseInt(routeInput, 10)
     if (!routeInput || isNaN(val) || val < 2 || val > 852) {
       setError('Enter a valid route number between 2 and 852.')
-      return
+      return false
     }
     setError(null)
     setBuses([])
     addToHistory(val)
     setActiveRoute(val)
+    return true
   }
 
   function handleHistorySelect(route) {
@@ -334,6 +336,19 @@ function App() {
             bus={selectedBus}
             onClose={() => setSelectedBus(null)}
             onTrackRoute={handleTrackRoute}
+          />
+          <MobileMapSearch
+            routeInput={routeInput}
+            onRouteChange={setRouteInput}
+            onSubmit={handleSubmit}
+            loading={loading}
+            error={error}
+            activeRoute={activeRoute}
+            busCount={buses.length}
+            countdown={countdown}
+            routeHistory={routeHistory}
+            onHistorySelect={handleHistorySelect}
+            activePanel={activePanel}
           />
         </div>
       </div>
