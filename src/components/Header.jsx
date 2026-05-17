@@ -1,3 +1,11 @@
+/*
+ * Header.jsx — Top bar shown on every screen.
+ * Displays the Metro Transit logo, app title, a live indicator dot,
+ * and a button to toggle between dark and light mode.
+ * Receives all its state as props from App.jsx — no local state.
+ */
+
+// Renders a sun icon used to indicate "switch to light mode"
 function SunIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
@@ -10,6 +18,7 @@ function SunIcon() {
   )
 }
 
+// Renders a moon icon used to indicate "switch to dark mode"
 function MoonIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"
@@ -19,20 +28,33 @@ function MoonIcon() {
   )
 }
 
+/*
+ * Props:
+ *   isLive         — true when bus data is actively being fetched; turns the dot green
+ *   theme          — 'dark' | 'light'; controls which toggle icon to show
+ *   onToggleTheme  — called when the user clicks the theme button
+ */
 function Header({ isLive, theme, onToggleTheme }) {
   return (
     <header className="header">
+      {/* Metro Transit logo loaded from /public */}
       <img src="/Metro_Transit.png" alt="Metro Transit" className="header-logo" />
       <div className="header-divider" />
       <div className="header-text">
         <div className="header-title">Live Bus Tracker</div>
         <div className="header-subtitle">Twin Cities Metro Area</div>
       </div>
+
+      {/* Pushes the badge and toggle to the right */}
       <div className="header-spacer" />
+
+      {/* Pulsing dot — turns green (active class) when a live fetch is running */}
       <div className={`live-badge${isLive ? ' active' : ''}`}>
         <span className="live-dot" />
         Live
       </div>
+
+      {/* Theme toggle — shows sun in dark mode, moon in light mode */}
       <button
         className="theme-toggle-btn"
         onClick={onToggleTheme}

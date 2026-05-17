@@ -1,3 +1,12 @@
+/*
+ * SearchPanel.jsx — Desktop sidebar panel for the Live Map tab.
+ * Lets the user type a route number, click "Track Route", and see
+ * a countdown timer + bus count while tracking is active.
+ * Also renders recent route history chips and a favorite (star) toggle.
+ * All state lives in App.jsx; this component is purely presentational.
+ */
+
+// Warning icon shown next to validation error messages
 function WarnIcon() {
   return (
     <svg
@@ -11,6 +20,7 @@ function WarnIcon() {
   )
 }
 
+// Star icon used for the favorite button; filled=true makes it gold
 function StarIcon({ filled }) {
   return (
     <svg width="15" height="15" viewBox="0 0 20 20"
@@ -23,13 +33,31 @@ function StarIcon({ filled }) {
   )
 }
 
+/*
+ * Props:
+ *   routeInput      — current text in the route number field
+ *   onRouteChange   — called on every keystroke with the new value
+ *   onSubmit        — called when Track is clicked or Enter is pressed
+ *   loading         — true while buses are being fetched
+ *   error           — validation or fetch error string, or null
+ *   activeRoute     — the route number currently being tracked (null if none)
+ *   busCount        — number of buses returned by the last fetch
+ *   countdown       — seconds remaining until the next auto-refresh (0–30)
+ *   routeHistory    — array of recently tracked route numbers
+ *   onHistorySelect — called with a route number when a history chip is tapped
+ *   favorites       — array of favorited route IDs (as strings)
+ *   onToggleFavorite — called with the route ID to star/unstar it
+ */
 function SearchPanel({
   routeInput, onRouteChange, onSubmit,
   loading, error, activeRoute, busCount,
   countdown, routeHistory, onHistorySelect,
   favorites = [], onToggleFavorite,
 }) {
+  // Whether the active route is in the user's favorites list
   const isFav = favorites.includes(String(activeRoute))
+
+  // Percentage of the 30-second refresh cycle already elapsed, drives the progress bar
   const countdownPct = (countdown / 30) * 100
 
   return (
@@ -40,6 +68,7 @@ function SearchPanel({
       </div>
 
       <div className="panel-body">
+        {/* Route number input — accepts 2–852 */}
         <div>
           <label className="input-label" htmlFor="route-input">
             Route number (2 – 852)
@@ -57,6 +86,7 @@ function SearchPanel({
           />
         </div>
 
+        {/* Track button — disabled while loading to prevent double-submits */}
         <button className="track-btn" onClick={onSubmit} disabled={loading}>
           {loading ? (
             <><span className="spinner" />Loading…</>
@@ -65,6 +95,7 @@ function SearchPanel({
           )}
         </button>
 
+        {/* Inline error shown for invalid input or failed API call */}
         {error && (
           <div className="error-msg">
             <WarnIcon />
@@ -72,6 +103,7 @@ function SearchPanel({
           </div>
         )}
 
+        {/* Recent history chips — quick re-select of past routes */}
         {routeHistory.length > 0 && (
           <div className="history-section">
             <span className="history-label">Recent</span>
@@ -90,15 +122,18 @@ function SearchPanel({
         )}
       </div>
 
+      {/* Footer shown only when a route is actively tracked */}
       {activeRoute && (
         <div className="panel-footer">
           <div className="panel-status">
+            {/* Bus count and route label */}
             <span className="status-text">
               Route {activeRoute}
               {' · '}
               {loading ? 'refreshing…' : `${busCount > 0 ? `${busCount} in service` : 'no buses'}`}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {/* Star button to save/remove this route from favorites */}
               <button
                 className={`star-btn${isFav ? ' starred' : ''}`}
                 onClick={() => onToggleFavorite?.(String(activeRoute))}
@@ -106,9 +141,11 @@ function SearchPanel({
               >
                 <StarIcon filled={isFav} />
               </button>
+              {/* Countdown label — hidden while loading */}
               {!loading && <span className="countdown-label">{countdown}s</span>}
             </div>
           </div>
+          {/* Progress bar fills left-to-right as the refresh countdown ticks down */}
           <div className="countdown-track">
             <div
               className="countdown-fill"

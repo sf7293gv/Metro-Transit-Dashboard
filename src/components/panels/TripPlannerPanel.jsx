@@ -1,11 +1,30 @@
+/*
+ * TripPlannerPanel.jsx — "Trip Planner" panel for planning a transit trip.
+ * The user enters a starting address and a destination; the panel:
+ *   1. Geocodes both addresses via OpenStreetMap Nominatim
+ *   2. Builds a coordinate cache of every Metro Transit stop (same approach as NearbyStops)
+ *   3. Finds the nearest stop to the origin using the Haversine formula
+ *   4. Fetches the next 3 departures from that stop
+ *
+ * Results include the origin stop name and walk distance, departure suggestions
+ * with live/scheduled badges, a "Track Route" shortcut, and the nearest destination stop.
+ * The map is updated with A/B pins via the onTripUpdate callback.
+ *
+ * The stop coordinate cache is module-level and shared with TripPlannerPanel instances —
+ * it survives remounts and is only built once per browser session.
+ */
+
 import { useState } from 'react'
 
 // ── module-level stop coordinate cache ────────────────────────────────────────
-// Built once per session; persists across searches.
+// Built once per session; persists across searches and remounts.
 
-let stopCoordCache = null  // Map<place_code, {place_code, stop_id, description, lat, lng}>
+// stopCoordCache — Map<place_code, {place_code, stop_id, description, lat, lng}>; null until built
+let stopCoordCache = null
+// buildingPromise — prevents parallel builds if called before the first one completes
 let buildingPromise = null
 
+// Haversine formula — straight-line distance in miles between two lat/lon coordinates
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 3958.8
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -17,10 +36,17 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+// Formats a distance in miles as "X ft" under 0.1 mi, or "X.XX mi" otherwise
 function formatDist(mi) {
   return mi < 0.1 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(2)} mi`
 }
 
+/*
+ * Geocodes an address string to lat/lng using OpenStreetMap Nominatim.
+ * API: GET https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1&countrycodes=us
+ * Returns: {lat, lng, displayName} or null if not found.
+ * Requires User-Agent header per Nominatim usage policy.
+ */
 async function geocodeAddress(query) {
   const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&countrycodes=us`
   const res = await fetch(url, {
@@ -32,6 +58,17 @@ async function geocodeAddress(query) {
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), displayName: data[0].display_name }
 }
 
+/*
+ * Builds the stop coordinate cache used to find the nearest stop to a lat/lng.
+ * Two phases:
+ *   Phase 1 (0–40%): collect unique place_codes from all route stop lists
+ *     GET https://svc.metrotransit.org/nextrip/routes → all route IDs
+ *     GET https://svc.metrotransit.org/nextrip/stops/{route_id}/{dir} → stop lists
+ *   Phase 2 (40–100%): resolve lat/lng for each unique stop
+ *     GET https://svc.metrotransit.org/nextrip/{route}/{dir}/{place_code}
+ *     → {stops: [{stop_id, latitude, longitude}]}
+ * onProgress callback receives a percentage 0–100 for the progress bar.
+ */
 async function buildCoordCache(onProgress) {
   if (stopCoordCache !== null) return stopCoordCache
   if (buildingPromise) return buildingPromise
@@ -63,6 +100,7 @@ async function buildCoordCache(onProgress) {
           const { routeId, dir, list } = r.value
           if (!Array.isArray(list)) continue
           for (const s of list) {
+            // First occurrence wins — one route/dir pair is enough for coord lookup
             if (s.place_code && s.description && !stopMap.has(s.place_code)) {
               stopMap.set(s.place_code, {
                 place_code:  s.place_code,
@@ -110,7 +148,7 @@ async function buildCoordCache(onProgress) {
       stopCoordCache = coordMap
       return coordMap
     } catch (err) {
-      buildingPromise = null  // allow retry on failure
+      buildingPromise = null  // allow retry if the build fails
       throw err
     }
   })()
@@ -118,6 +156,7 @@ async function buildCoordCache(onProgress) {
   return buildingPromise
 }
 
+// Iterates the entire coordinate map and returns the stop closest to a lat/lng point
 function findNearestStop(coordMap, lat, lng) {
   let nearest = null
   let minDist = Infinity
@@ -130,6 +169,7 @@ function findNearestStop(coordMap, lat, lng) {
 
 // ── icons ─────────────────────────────────────────────────────────────────────
 
+// Warning circle icon for error messages
 function WarnIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -139,6 +179,7 @@ function WarnIcon() {
   )
 }
 
+// Location pin icon for the "Use my location" button
 function LocationIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor"
@@ -149,6 +190,7 @@ function LocationIcon() {
   )
 }
 
+// Decorative A→B illustration shown in the idle (no result) state
 function EmptyIllustration() {
   return (
     <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -167,16 +209,32 @@ function EmptyIllustration() {
 
 // ── main component ────────────────────────────────────────────────────────────
 
+/*
+ * Props:
+ *   onTripUpdate — called with {from: {lat,lng,label}, to: {lat,lng,label}} after a
+ *                  successful search; App.jsx uses this to place A/B pins on the map
+ *   onTrackRoute — called with a route_id when "Track Route →" is clicked
+ */
 function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
+  // fromInput — text in the "Starting location" field
   const [fromInput,          setFromInput]          = useState('')
+  // toInput — text in the "Destination" field
   const [toInput,            setToInput]            = useState('')
+  // fromCoordsOverride — set when GPS is used; bypasses geocoding for the origin
   const [fromCoordsOverride, setFromCoordsOverride] = useState(null)
 
-  const [phase,    setPhase]    = useState('idle') // idle|geocoding|scanning|loading|done|error
+  // phase — controls which body content is shown: 'idle'|'geocoding'|'scanning'|'loading'|'done'|'error'
+  const [phase,    setPhase]    = useState('idle')
+  // progress — 0–100 percentage for the cache-build progress bar
   const [progress, setProgress] = useState(0)
+  // result — { from, to, originStop, destStop, departures } on success
   const [result,   setResult]   = useState(null)
+  // error — human-readable error string or null
   const [error,    setError]    = useState(null)
 
+  /*
+   * Main search handler — runs the full geocode → cache → nearest-stop → departures flow.
+   */
   async function handleFindRoutes() {
     const from = fromInput.trim()
     const to   = toInput.trim()
@@ -187,6 +245,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
     setResult(null)
 
     try {
+      // Step 1 — Geocode both addresses (or use GPS override for origin)
       setPhase('geocoding')
       const [fromCoords, toCoords] = await Promise.all([
         fromCoordsOverride
@@ -198,15 +257,20 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
       if (!fromCoords) throw new Error(`Could not find "${from}". Try a more specific address.`)
       if (!toCoords)   throw new Error(`Could not find "${to}". Try a more specific address.`)
 
+      // Step 2 — Build stop coordinate cache (skipped if already built)
       setPhase('scanning')
       setProgress(stopCoordCache !== null ? 100 : 0)
       const coordMap = await buildCoordCache(pct => setProgress(pct))
       setProgress(100)
 
+      // Step 3 — Find the nearest stop to the origin and destination
       const originStop = findNearestStop(coordMap, fromCoords.lat, fromCoords.lng)
       const destStop   = findNearestStop(coordMap, toCoords.lat,   toCoords.lng)
       if (!originStop) throw new Error('No transit stops found near your starting location.')
 
+      // Step 4 — Fetch the next 3 departures from the origin stop
+      // GET https://svc.metrotransit.org/nextrip/{stop_id}
+      // Returns: { departures: [{route_short_name, description, departure_text, actual, route_id}] }
       setPhase('loading')
       const depRes = await fetch(`https://svc.metrotransit.org/nextrip/${originStop.stop_id}`)
       if (!depRes.ok) throw new Error('Could not load departures from the nearest stop.')
@@ -216,6 +280,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
       setResult({ from: fromCoords, to: toCoords, originStop, destStop, departures })
       setPhase('done')
 
+      // Update the map with A/B pins for the trip endpoints
       onTripUpdate?.({
         from: { lat: fromCoords.lat, lng: fromCoords.lng, label: from },
         to:   { lat: toCoords.lat,   lng: toCoords.lng,   label: to },
@@ -226,6 +291,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
     }
   }
 
+  // Fills the origin field with the user's current GPS coordinates
   function handleUseMyLocation() {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.')
@@ -242,7 +308,9 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
     )
   }
 
+  // true while any of the async phases are running — disables inputs and the Find button
   const isSearching = phase === 'geocoding' || phase === 'scanning' || phase === 'loading'
+  // Label for the progress bar during the cache-build phase
   const scanLabel   = progress < 40 ? 'Loading route network…' : 'Mapping stop locations…'
 
   return (
@@ -252,6 +320,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
         <div className="panel-heading">Plan your ride</div>
       </div>
 
+      {/* Origin and destination inputs with A/B labels */}
       <div className="trip-form-area">
         <div className="trip-field-row">
           <span className="trip-field-dot trip-dot-from">A</span>
@@ -264,6 +333,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
             onKeyDown={e => e.key === 'Enter' && handleFindRoutes()}
             disabled={isSearching}
           />
+          {/* GPS button — replaces origin text with "My Location" and stores lat/lng */}
           <button
             className="trip-loc-btn"
             onClick={handleUseMyLocation}
@@ -275,6 +345,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
           </button>
         </div>
 
+        {/* Decorative connecting line between A and B fields */}
         <div className="trip-connector" aria-hidden="true" />
 
         <div className="trip-field-row">
@@ -290,6 +361,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
           />
         </div>
 
+        {/* Find Routes button — disabled while searching or inputs are empty */}
         <button
           className="panel-btn"
           style={{ marginTop: 4, width: '100%' }}
@@ -305,6 +377,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
 
       <div className="panel-body">
 
+        {/* Geocoding or API error */}
         {error && (
           <div className="error-msg">
             <WarnIcon />
@@ -312,6 +385,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
           </div>
         )}
 
+        {/* Progress bar shown while the stop coordinate cache is being built */}
         {phase === 'scanning' && progress < 100 && (
           <div className="trip-scan-wrap">
             <div className="trip-scan-row">
@@ -325,6 +399,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
           </div>
         )}
 
+        {/* Idle state — shown before the user submits their first search */}
         {phase === 'idle' && (
           <div className="trip-empty">
             <div className="trip-empty-icon"><EmptyIllustration /></div>
@@ -335,9 +410,10 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
           </div>
         )}
 
+        {/* Results — shown after a successful search */}
         {phase === 'done' && result && (
           <>
-            {/* Origin stop */}
+            {/* Origin stop card — shows stop name and walk distance */}
             <div className="trip-stop-card">
               <span className="trip-stop-dot trip-dot-from" />
               <div>
@@ -346,7 +422,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
               </div>
             </div>
 
-            {/* Departure suggestions */}
+            {/* Departure suggestions from the origin stop */}
             <div className="section-label">Next departures</div>
             {result.departures.length === 0 ? (
               <div className="routes-empty">No upcoming departures from this stop.</div>
@@ -365,6 +441,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
                   <span className="trip-dep-walk">
                     Walk {formatDist(result.originStop.distance)} to stop
                   </span>
+                  {/* Shortcut to start tracking this route on the map */}
                   <button
                     className="trip-track-btn"
                     onClick={() => onTrackRoute?.(dep.route_id)}
@@ -375,7 +452,7 @@ function TripPlannerPanel({ onTripUpdate, onTrackRoute }) {
               </div>
             ))}
 
-            {/* Destination stop */}
+            {/* Destination stop card — shows nearest stop to the destination */}
             {result.destStop && (
               <div className="trip-stop-card">
                 <span className="trip-stop-dot trip-dot-to" />

@@ -1,12 +1,27 @@
+/*
+ * NearbyStopsPanel.jsx — Finds all Metro Transit stops within ½ mile of the user.
+ * Performs a 6-phase scan:
+ *   1. Get GPS coordinates via the browser Geolocation API
+ *   2. Fetch the list of all routes
+ *   3. Fetch stop lists for every route × direction (batched at 30 to avoid rate limits)
+ *   4. Deduplicate stops by place_code and build a unified map
+ *   5. Resolve coordinates + departures for each unique stop (batched at 15)
+ *   6. Re-fetch departures by stop_id to capture all routes serving each stop
+ *
+ * Results appear progressively as each batch completes.
+ * Uses a scanIdRef to discard results from cancelled/superseded scans.
+ */
+
 import { useState, useRef } from 'react'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
-const RADIUS      = 0.5   // miles
-const CONCURRENCY = 15    // parallel coord-resolve calls
+const RADIUS      = 0.5   // search radius in miles
+const CONCURRENCY = 15    // parallel coordinate-resolve calls per batch
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// Haversine formula — calculates the straight-line distance in miles between two lat/lon points
 function haversine(lat1, lon1, lat2, lon2) {
   const R  = 3958.8
   const dL = (lat2 - lat1) * Math.PI / 180
@@ -16,10 +31,12 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.asin(Math.sqrt(a))
 }
 
+// Formats a distance in miles as "X ft" under 0.1 mi, or "X.XX mi" otherwise
 function formatDist(mi) {
   return mi < 0.1 ? `${Math.round(mi * 5280)} ft` : `${mi.toFixed(2)} mi`
 }
 
+// Wraps the browser Geolocation API in a promise
 function getUserLocation() {
   return new Promise((resolve, reject) =>
     navigator.geolocation.getCurrentPosition(
@@ -32,6 +49,7 @@ function getUserLocation() {
 
 // ── icons ─────────────────────────────────────────────────────────────────────
 
+// Warning circle icon for error states
 function WarnIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -41,18 +59,20 @@ function WarnIcon() {
   )
 }
 
+// Circular refresh arrow for the "Refresh" button
 function RefreshIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 20 20" fill="none"
       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M16.5 9.5A6.5 6.5 0 1 0 14 15.2" />
-      <path d="M14 11V15h4" />
+      <path d="M14 14V18M14 14h4" />
     </svg>
   )
 }
 
 // ── stop card ─────────────────────────────────────────────────────────────────
 
+// Displays one nearby stop: name, distance, served routes (up to 7), and next 2 departures
 function NearbyStopCard({ stop, onSelect }) {
   return (
     <div
@@ -67,6 +87,7 @@ function NearbyStopCard({ stop, onSelect }) {
         <span className="nearby-stop-dist">{formatDist(stop.distance)}</span>
       </div>
 
+      {/* Route badges — up to 7 shown; overflow count if more */}
       <div className="nearby-stop-routes">
         {stop.routes.slice(0, 7).map(r => (
           <span key={r} className="nearby-route-badge">{r}</span>
@@ -76,6 +97,7 @@ function NearbyStopCard({ stop, onSelect }) {
         )}
       </div>
 
+      {/* Next 2 departures, or a "no departures" note */}
       {stop.departures.length > 0 ? (
         <div className="nearby-deps">
           {stop.departures.slice(0, 2).map((d, i) => (
@@ -95,11 +117,21 @@ function NearbyStopCard({ stop, onSelect }) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
+/*
+ * Props:
+ *   onStopSelect — called with a stop object when the user clicks a stop card;
+ *                  App.jsx uses this to fly the map to that stop
+ */
 function NearbyStopsPanel({ onStopSelect }) {
+  // phase — controls which UI state is shown: 'idle'|'locating'|'scanning'|'error'|'done'
   const [phase,    setPhase]    = useState('idle')
+  // stops — array of nearby stops sorted by distance; updated progressively during scan
   const [stops,    setStops]    = useState([])
+  // progress — { checked, total } for the progress bar during scanning
   const [progress, setProgress] = useState({ checked: 0, total: 0 })
+  // errMsg — human-readable error shown in the error phase
   const [errMsg,   setErrMsg]   = useState('')
+  // scanIdRef — incremented on each new scan; used to discard results from old scans
   const scanIdRef = useRef(0)
 
   async function startScan() {
@@ -109,7 +141,7 @@ function NearbyStopsPanel({ onStopSelect }) {
     setProgress({ checked: 0, total: 0 })
     setErrMsg('')
 
-    // 1 — GPS
+    // Phase 1 — Get GPS coordinates
     let lat, lng
     try {
       ;({ lat, lng } = await getUserLocation())
@@ -122,7 +154,9 @@ function NearbyStopsPanel({ onStopSelect }) {
     if (id !== scanIdRef.current) return
     setPhase('scanning')
 
-    // 2 — All routes
+    // Phase 2 — Fetch all routes
+    // GET https://svc.metrotransit.org/nextrip/routes
+    // Returns: [{route_id, route_label, agency_id}, ...]
     let routes
     try {
       routes = await fetch('https://svc.metrotransit.org/nextrip/routes').then(r => r.json())
@@ -134,7 +168,9 @@ function NearbyStopsPanel({ onStopSelect }) {
     }
     if (id !== scanIdRef.current) return
 
-    // 3 — Stop lists (place_codes) for every route × direction, batched at 30
+    // Phase 3 — Fetch stop lists (place_codes) for every route × direction, batched at 30
+    // GET https://svc.metrotransit.org/nextrip/stops/{route_id}/{dir}
+    // Returns: [{place_code, description}, ...]
     const listTasks = routes.flatMap(r => [
       { routeId: r.route_id, dir: 0 },
       { routeId: r.route_id, dir: 1 },
@@ -157,7 +193,7 @@ function NearbyStopsPanel({ onStopSelect }) {
     }
     if (id !== scanIdRef.current) return
 
-    // 4 — Deduplicate stops by place_code; track which routes serve each
+    // Phase 4 — Deduplicate stops by place_code; record which routes serve each stop
     const stopMap = new Map()
     for (const { routeId, dir, list } of listResults) {
       if (!Array.isArray(list)) continue
@@ -168,7 +204,7 @@ function NearbyStopsPanel({ onStopSelect }) {
             place_code:   s.place_code,
             description:  s.description,
             routes:       [],
-            fetchRoute:   routeId,
+            fetchRoute:   routeId,  // one route/dir pair to use for coordinate lookup
             fetchDir:     dir,
           })
         }
@@ -182,8 +218,9 @@ function NearbyStopsPanel({ onStopSelect }) {
     setProgress({ checked: 0, total })
     if (id !== scanIdRef.current) return
 
-    // 5 — Resolve coordinates + departures in batches; display progressively
-    //     GET /nextrip/{route}/{dir}/{place_code} returns both coords AND departures
+    // Phase 5 — Resolve coordinates + departures in batches; display progressively
+    // GET https://svc.metrotransit.org/nextrip/{route}/{dir}/{place_code}
+    // Returns: { stops: [{stop_id, latitude, longitude}], departures: [...] }
     const nearby = []
 
     for (let i = 0; i < unique.length; i += CONCURRENCY) {
@@ -198,7 +235,7 @@ function NearbyStopsPanel({ onStopSelect }) {
           const s = data.stops?.[0]
           if (!s?.latitude || !s?.longitude) return null
           const dist = haversine(lat, lng, s.latitude, s.longitude)
-          if (dist > RADIUS) return null
+          if (dist > RADIUS) return null  // outside search radius — skip
           return {
             stop_id:     s.stop_id,
             place_code:  stop.place_code,
@@ -220,12 +257,15 @@ function NearbyStopsPanel({ onStopSelect }) {
       const checked = Math.min(i + CONCURRENCY, total)
       if (id !== scanIdRef.current) return
       setProgress({ checked, total })
+      // Render partial results immediately so the user sees stops as they're found
       if (anyNew) setStops([...nearby].sort((a, b) => a.distance - b.distance))
     }
 
     if (id !== scanIdRef.current) return
 
-    // 6 — Refresh departures via stop_id to get ALL routes at each stop
+    // Phase 6 — Refresh departures via stop_id to capture ALL routes at each stop
+    // (phase 5 only returns departures for the one route used for coordinate lookup)
+    // GET https://svc.metrotransit.org/nextrip/{stop_id}
     if (nearby.length > 0) {
       const depOut = await Promise.allSettled(
         nearby.map(s =>
@@ -250,6 +290,7 @@ function NearbyStopsPanel({ onStopSelect }) {
     setPhase('done')
   }
 
+  // Percentage complete for the progress bar during scanning
   const pct = progress.total > 0 ? (progress.checked / progress.total) * 100 : 0
 
   return (
@@ -261,7 +302,7 @@ function NearbyStopsPanel({ onStopSelect }) {
 
       <div className="panel-body">
 
-        {/* ── idle ── */}
+        {/* ── idle — initial state before any scan ── */}
         {phase === 'idle' && (
           <div className="nearby-cta">
             <button className="panel-btn" onClick={startScan}>
@@ -274,7 +315,7 @@ function NearbyStopsPanel({ onStopSelect }) {
           </div>
         )}
 
-        {/* ── locating ── */}
+        {/* ── locating — waiting for browser GPS permission ── */}
         {phase === 'locating' && (
           <div className="nearby-state-msg">
             <span className="spinner" style={{ width: 18, height: 18 }} />
@@ -282,7 +323,7 @@ function NearbyStopsPanel({ onStopSelect }) {
           </div>
         )}
 
-        {/* ── scanning ── */}
+        {/* ── scanning — showing progress bar and partial results ── */}
         {phase === 'scanning' && (
           <>
             <div className="nearby-progress-wrap">
@@ -310,7 +351,7 @@ function NearbyStopsPanel({ onStopSelect }) {
           </>
         )}
 
-        {/* ── error ── */}
+        {/* ── error — GPS denied or API failure ── */}
         {phase === 'error' && (
           <>
             <div className="error-msg">
@@ -321,7 +362,7 @@ function NearbyStopsPanel({ onStopSelect }) {
           </>
         )}
 
-        {/* ── done ── */}
+        {/* ── done — scan complete, show final results ── */}
         {phase === 'done' && (
           <>
             <div className="nearby-done-bar">

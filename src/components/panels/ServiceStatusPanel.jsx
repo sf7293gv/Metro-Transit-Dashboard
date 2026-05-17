@@ -1,10 +1,20 @@
+/*
+ * ServiceStatusPanel.jsx — Live service alerts for Twin Cities transit.
+ * Fetches alerts from 10 major stops and deduplicates them by alert text.
+ * Closed-stop alerts appear first; general service warnings follow.
+ * Data refreshes every 5 minutes automatically; user can also refresh manually.
+ * Shows an "All systems normal" state when no active alerts are found.
+ */
+
 import { useState, useEffect } from 'react'
 
+// Stop IDs for major Twin Cities hubs used as alert sources
 const STOP_IDS   = [56913, 51403, 56034, 17976, 56945, 51406, 56022, 56029, 56037, 56044]
-const REFETCH_MS = 5 * 60 * 1000
+const REFETCH_MS = 5 * 60 * 1000  // re-fetch every 5 minutes
 
 // ── icons ─────────────────────────────────────────────────────────────────────
 
+// Warning circle icon for inline error messages
 function WarnIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -14,6 +24,7 @@ function WarnIcon() {
   )
 }
 
+// Circular arrow icon for the Refresh button
 function RefreshIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 20 20" fill="none"
@@ -24,6 +35,7 @@ function RefreshIcon() {
   )
 }
 
+// Checkmark icon shown in the "all clear" state
 function CheckIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
@@ -35,11 +47,13 @@ function CheckIcon() {
 
 // ── alert card ────────────────────────────────────────────────────────────────
 
+// Renders a single deduplicated alert with its text, badge type, and affected stops
 function AlertCard({ alert, onViewStop }) {
   const isClosed = alert.stop_closed
   return (
     <div className={`svc-alert-card${isClosed ? ' svc-alert-closed' : ' svc-alert-warning'}`}>
       <div className="svc-alert-header">
+        {/* "Stop Closed" badge in red, "Service Alert" in yellow */}
         <span className={`svc-alert-badge${isClosed ? ' svc-badge-closed' : ' svc-badge-warning'}`}>
           {isClosed ? 'Stop Closed' : 'Service Alert'}
         </span>
@@ -47,6 +61,7 @@ function AlertCard({ alert, onViewStop }) {
 
       <p className="svc-alert-text">{alert.alert_text}</p>
 
+      {/* List of stops affected by this alert, with "View Stop" buttons */}
       {alert.affectedStops.length > 0 && (
         <div className="svc-alert-stops">
           {alert.affectedStops.slice(0, 3).map(stop => (
@@ -60,6 +75,7 @@ function AlertCard({ alert, onViewStop }) {
               </button>
             </div>
           ))}
+          {/* Overflow count when more than 3 stops are affected */}
           {alert.affectedStops.length > 3 && (
             <span className="svc-alert-more">
               +{alert.affectedStops.length - 3} more stops affected
@@ -73,12 +89,25 @@ function AlertCard({ alert, onViewStop }) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
+/*
+ * Props:
+ *   onStopSelect — called with {stop_id} when "View Stop" is clicked on an alert card
+ */
 function ServiceStatusPanel({ onStopSelect }) {
+  // alerts — deduplicated array of { alert_text, stop_closed, affectedStops[] }
   const [alerts,      setAlerts]      = useState([])
+  // loading — true while a fetch is in progress
   const [loading,     setLoading]     = useState(false)
+  // error — error string or null
   const [error,       setError]       = useState(null)
+  // lastUpdated — Date object of the most recent successful fetch
   const [lastUpdated, setLastUpdated] = useState(null)
 
+  /*
+   * Fetches alerts from all 10 stops in parallel and deduplicates by alert_text.
+   * API: GET https://svc.metrotransit.org/nextrip/{stopId}
+   * Returns: { stops: [{stop_id, description}], alerts: [{alert_text, stop_closed}], ... }
+   */
   async function fetchStatus() {
     setLoading(true)
     setError(null)
@@ -96,7 +125,7 @@ function ServiceStatusPanel({ onStopSelect }) {
         )
       )
 
-      // Deduplicate alerts by text; collect which stops each alert affects
+      // Deduplicate alerts by text; collect all stops affected by each unique message
       const alertMap = new Map()
       for (const r of results) {
         if (r.status !== 'fulfilled') continue
@@ -111,6 +140,7 @@ function ServiceStatusPanel({ onStopSelect }) {
             })
           }
           const entry = alertMap.get(alert.alert_text)
+          // If any source marks this alert as a closure, the combined entry is also closed
           if (alert.stop_closed) entry.stop_closed = true
           if (stopInfo && !entry.affectedStops.some(s => s.stop_id === stopInfo.stop_id)) {
             entry.affectedStops.push({
@@ -136,16 +166,19 @@ function ServiceStatusPanel({ onStopSelect }) {
     }
   }
 
+  // Fetch on mount and re-fetch every 5 minutes
   useEffect(() => {
     fetchStatus()
     const id = setInterval(fetchStatus, REFETCH_MS)
     return () => clearInterval(id)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Format the last-updated time as "Updated HH:MM AM/PM"
   const updatedText = lastUpdated
     ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : null
 
+  // Summary counts for the chip row above the alert cards
   const closedCount  = alerts.filter(a => a.stop_closed).length
   const warningCount = alerts.filter(a => !a.stop_closed).length
 
@@ -156,7 +189,7 @@ function ServiceStatusPanel({ onStopSelect }) {
         <div className="panel-heading">Twin Cities transit alerts</div>
       </div>
 
-      {/* toolbar */}
+      {/* Toolbar — shows last-updated time and a manual refresh button */}
       <div className="svc-toolbar">
         <span className="svc-updated-text">
           {loading ? 'Refreshing…' : (updatedText ?? 'Checking alerts…')}
@@ -169,7 +202,7 @@ function ServiceStatusPanel({ onStopSelect }) {
 
       <div className="panel-body">
 
-        {/* error */}
+        {/* Fetch error */}
         {error && !loading && (
           <div className="error-msg">
             <WarnIcon />
@@ -177,7 +210,7 @@ function ServiceStatusPanel({ onStopSelect }) {
           </div>
         )}
 
-        {/* initial loading */}
+        {/* Initial loading spinner — only shown before the first fetch completes */}
         {loading && alerts.length === 0 && (
           <div className="nearby-state-msg">
             <span className="spinner" style={{ width: 18, height: 18 }} />
@@ -185,7 +218,7 @@ function ServiceStatusPanel({ onStopSelect }) {
           </div>
         )}
 
-        {/* all clear */}
+        {/* All-clear state — shown when the fetch completed but found no alerts */}
         {!loading && !error && alerts.length === 0 && lastUpdated && (
           <div className="svc-all-clear">
             <div className="svc-all-clear-icon">
@@ -196,9 +229,10 @@ function ServiceStatusPanel({ onStopSelect }) {
           </div>
         )}
 
-        {/* summary + cards */}
+        {/* Summary chips + alert cards */}
         {alerts.length > 0 && (
           <>
+            {/* Count chips — "N closed" and "N alerts" */}
             <div className="svc-summary">
               {closedCount > 0 && (
                 <span className="svc-summary-chip svc-summary-closed">
@@ -212,6 +246,7 @@ function ServiceStatusPanel({ onStopSelect }) {
               )}
             </div>
 
+            {/* One card per unique alert */}
             {alerts.map((alert, i) => (
               <AlertCard key={i} alert={alert} onViewStop={onStopSelect} />
             ))}

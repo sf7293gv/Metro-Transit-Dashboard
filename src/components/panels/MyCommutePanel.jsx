@@ -1,8 +1,17 @@
+/*
+ * MyCommutePanel.jsx — "My Commute" tab for saving a home and work stop.
+ * Renders two independent CommuteStop sub-components side by side.
+ * Each CommuteStop manages its own stop ID, saved state, and departure fetch.
+ * Stop IDs are persisted in localStorage so they survive page reloads.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 
+// localStorage keys for the two saved stops
 const HOME_KEY = 'mt-commute-home'
 const WORK_KEY = 'mt-commute-work'
 
+// Warning icon used for error messages
 function WarnIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -12,6 +21,7 @@ function WarnIcon() {
   )
 }
 
+// House icon for the Home Stop label
 function HomeIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -21,6 +31,7 @@ function HomeIcon() {
   )
 }
 
+// Briefcase icon for the Work Stop label
 function WorkIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -31,6 +42,7 @@ function WorkIcon() {
   )
 }
 
+// Circular refresh icon for the Refresh button
 function RefreshIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -40,6 +52,7 @@ function RefreshIcon() {
   )
 }
 
+// Single departure row showing route badge, destination, direction, time, and live/sched badge
 function DepartureItem({ dep }) {
   return (
     <div className="departure-item">
@@ -57,13 +70,32 @@ function DepartureItem({ dep }) {
   )
 }
 
+/*
+ * CommuteStop — one home or work stop widget.
+ * Manages its own save/clear/fetch lifecycle independently of the other stop.
+ *
+ * Props:
+ *   storageKey — localStorage key ('mt-commute-home' or 'mt-commute-work')
+ *   label      — display label ("Home Stop" or "Work Stop")
+ *   Icon       — icon component rendered beside the label
+ */
 function CommuteStop({ storageKey, label, Icon }) {
+  // savedId — the stop ID that has been confirmed and saved to localStorage
   const [savedId, setSavedId]   = useState(() => localStorage.getItem(storageKey) || '')
+  // inputVal — the current text in the stop ID input field
   const [inputVal, setInputVal] = useState(() => localStorage.getItem(storageKey) || '')
+  // data — full API response including stops, departures, and alerts
   const [data, setData]         = useState(null)
+  // loading — true while a fetch is in progress
   const [loading, setLoading]   = useState(false)
+  // error — error string or null
   const [error, setError]       = useState(null)
 
+  /*
+   * Fetches stop info and departures for the given stop ID.
+   * API: GET https://svc.metrotransit.org/nextrip/{stopId}
+   * Returns: { stops: [{stop_id, description}], departures: [...], alerts: [...] }
+   */
   const fetchStop = useCallback(async (id) => {
     if (!id) return
     setLoading(true)
@@ -82,11 +114,12 @@ function CommuteStop({ storageKey, label, Icon }) {
     }
   }, [])
 
-  // Auto-fetch on mount if a stop is saved
+  // Auto-fetch on mount if a stop was previously saved
   useEffect(() => {
     if (savedId) fetchStop(savedId)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Validates the input, saves to localStorage, and fetches the stop
   function handleSave() {
     const id = inputVal.trim()
     if (!id || isNaN(Number(id))) { setError('Enter a valid numeric stop ID.'); return }
@@ -95,6 +128,7 @@ function CommuteStop({ storageKey, label, Icon }) {
     fetchStop(id)
   }
 
+  // Clears the saved stop and resets all state
   function handleClear() {
     localStorage.removeItem(storageKey)
     setSavedId('')
@@ -103,9 +137,10 @@ function CommuteStop({ storageKey, label, Icon }) {
     setError(null)
   }
 
+  // Convenience aliases for the three sections of the API response
   const stop       = data?.stops?.[0]
   const alerts     = data?.alerts ?? []
-  const departures = (data?.departures ?? []).slice(0, 3)
+  const departures = (data?.departures ?? []).slice(0, 3)  // show next 3 departures
 
   return (
     <div className="commute-stop">
@@ -114,6 +149,7 @@ function CommuteStop({ storageKey, label, Icon }) {
           <Icon />
           {label}
         </div>
+        {/* Clear button only shown when a stop is saved */}
         {savedId && (
           <button className="commute-clear-btn" onClick={handleClear}>
             Clear
@@ -121,6 +157,7 @@ function CommuteStop({ storageKey, label, Icon }) {
         )}
       </div>
 
+      {/* Stop ID input + Save button */}
       <div className="commute-input-row">
         <input
           className="panel-input"
@@ -147,6 +184,7 @@ function CommuteStop({ storageKey, label, Icon }) {
         </div>
       )}
 
+      {/* Stop name + departures shown once a valid stop is saved */}
       {stop && (
         <>
           <div className="commute-refresh-row">
@@ -162,6 +200,7 @@ function CommuteStop({ storageKey, label, Icon }) {
             </button>
           </div>
 
+          {/* Service alerts for this stop, if any */}
           {alerts.length > 0 && (
             <div className="alert-box">
               <div className="alert-box-label">⚠ Alert</div>
@@ -171,6 +210,7 @@ function CommuteStop({ storageKey, label, Icon }) {
             </div>
           )}
 
+          {/* Next 3 departures, or empty state if none */}
           {departures.length === 0 ? (
             <div className="commute-empty">No upcoming departures.</div>
           ) : (
@@ -183,6 +223,7 @@ function CommuteStop({ storageKey, label, Icon }) {
         </>
       )}
 
+      {/* Prompt shown before any stop is saved */}
       {!savedId && !loading && !error && (
         <div className="commute-empty">Enter a stop ID to save this commute leg.</div>
       )}
@@ -190,6 +231,7 @@ function CommuteStop({ storageKey, label, Icon }) {
   )
 }
 
+// MyCommutePanel — wrapper that renders one CommuteStop for home and one for work
 function MyCommutePanel() {
   return (
     <div className="search-panel">

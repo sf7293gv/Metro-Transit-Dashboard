@@ -1,10 +1,34 @@
+/*
+ * StopFinderPanel.jsx — "Stop Finder" panel for looking up real-time departures.
+ * Accepts a numeric stop ID or a stop name typed by the user.
+ *
+ * Name search: a module-level stop index (all stops from all routes) is built
+ * in the background the first time this panel mounts. While typing, matches are
+ * shown in a dropdown; selecting one resolves the place_code to a numeric stop_id
+ * and then fetches departures for that stop.
+ *
+ * Numeric input: goes directly to GET /nextrip/{id}.
+ *
+ * The panel also accepts an external stopId prop (from map stop marker clicks),
+ * which triggers an automatic fetch bypassing the search input.
+ */
+
 import { useState, useEffect, useRef } from 'react'
 
 // ── module-level stop index ───────────────────────────────────────────────────
+// Shared across all renders — survives component unmount and remount.
 
+// stopIndex — array of { place_code, description, fetchRoute, fetchDir }; null until built
 let stopIndex = null
+// buildingPromise — prevents parallel builds if two renders call buildStopIndex simultaneously
 let buildingPromise = null
 
+/*
+ * Builds a flat list of all unique stops across all routes and directions.
+ * Batches requests at 30 at a time to avoid overwhelming the API.
+ * GET https://svc.metrotransit.org/nextrip/routes → all route IDs
+ * GET https://svc.metrotransit.org/nextrip/stops/{route_id}/{dir} → [{place_code, description}]
+ */
 async function buildStopIndex() {
   if (stopIndex !== null) return stopIndex
   if (buildingPromise) return buildingPromise
@@ -35,6 +59,7 @@ async function buildStopIndex() {
         if (!Array.isArray(list)) continue
         for (const s of list) {
           if (!s.place_code || !s.description) continue
+          // First occurrence wins — each stop only needs one route/dir for coordinate lookup
           if (!stopMap.has(s.place_code)) {
             stopMap.set(s.place_code, {
               place_code:  s.place_code,
@@ -55,6 +80,7 @@ async function buildStopIndex() {
 
 // ── icons ─────────────────────────────────────────────────────────────────────
 
+// Warning circle icon for error messages
 function WarnIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -66,6 +92,7 @@ function WarnIcon() {
 
 // ── highlight matching substring ──────────────────────────────────────────────
 
+// Wraps the matching portion of a suggestion label in a <mark> for visual emphasis
 function HighlightMatch({ text, query }) {
   if (!query) return text
   const idx = text.toLowerCase().indexOf(query.toLowerCase())
@@ -81,6 +108,7 @@ function HighlightMatch({ text, query }) {
 
 // ── departure item ────────────────────────────────────────────────────────────
 
+// One row in the departures list: route badge, destination, direction, time, live/sched badge
 function DepartureItem({ dep }) {
   return (
     <div className="departure-item">
@@ -100,25 +128,38 @@ function DepartureItem({ dep }) {
 
 // ── main component ────────────────────────────────────────────────────────────
 
+/*
+ * Props:
+ *   stopId — numeric stop ID passed in from outside (e.g. map stop marker click);
+ *            when it changes, triggers an automatic fetch
+ */
 function StopFinderPanel({ stopId }) {
+  // input — current value of the search field (stop ID or name text)
   const [input,        setInput]        = useState('')
+  // data — full API response { stops, departures, alerts }
   const [data,         setData]         = useState(null)
+  // loading — true while a fetch is in progress
   const [loading,      setLoading]      = useState(false)
+  // error — validation or fetch error string
   const [error,        setError]        = useState(null)
+  // indexReady — true once the background stop index build completes
   const [indexReady,   setIndexReady]   = useState(stopIndex !== null)
+  // suggestions — up to 6 matching stop objects shown in the dropdown
   const [suggestions,  setSuggestions]  = useState([])
+  // showDropdown — whether the suggestions list is visible
   const [showDropdown, setShowDropdown] = useState(false)
+  // activeIdx — keyboard-navigated index in the suggestions list (-1 = none)
   const [activeIdx,    setActiveIdx]    = useState(-1)
 
   const wrapperRef = useRef(null)
 
-  // Kick off index build in background
+  // Start building the stop index in the background as soon as this panel mounts
   useEffect(() => {
     if (stopIndex !== null) return
     buildStopIndex().then(() => setIndexReady(true)).catch(() => {})
   }, [])
 
-  // Close dropdown when clicking outside
+  // Close the dropdown when the user clicks anywhere outside the search area
   useEffect(() => {
     function onMouseDown(e) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
@@ -129,6 +170,11 @@ function StopFinderPanel({ stopId }) {
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [])
 
+  /*
+   * Fetches departures for a numeric stop ID.
+   * API: GET https://svc.metrotransit.org/nextrip/{id}
+   * Returns: { stops: [{stop_id, description}], departures: [...], alerts: [...] }
+   */
   async function fetchStop(explicitId) {
     const id = (explicitId != null ? String(explicitId) : input).trim()
     if (!id) { setError('Enter a stop ID or name.'); return }
@@ -151,6 +197,14 @@ function StopFinderPanel({ stopId }) {
     }
   }
 
+  /*
+   * Fetches departures when the user selects a suggestion from the name dropdown.
+   * Two-step: place_code → stop_id, then full departures fetch.
+   * Step 1: GET https://svc.metrotransit.org/nextrip/{route}/{dir}/{place_code}
+   *         → resolves the numeric stop_id from the place_code
+   * Step 2: GET https://svc.metrotransit.org/nextrip/{stop_id}
+   *         → all-routes departures for this stop
+   */
   async function selectSuggestion(stop) {
     setShowDropdown(false)
     setSuggestions([])
@@ -159,7 +213,6 @@ function StopFinderPanel({ stopId }) {
     setError(null)
     setData(null)
     try {
-      // Resolve place_code → numeric stop_id via the route/dir/place endpoint
       const depRes = await fetch(
         `https://svc.metrotransit.org/nextrip/${stop.fetchRoute}/${stop.fetchDir}/${stop.place_code}`
       )
@@ -168,7 +221,6 @@ function StopFinderPanel({ stopId }) {
       const resolvedId = depJson.stops?.[0]?.stop_id
       if (!resolvedId) throw new Error()
 
-      // Fetch full all-routes departures for this stop
       const res = await fetch(`https://svc.metrotransit.org/nextrip/${resolvedId}`)
       if (!res.ok) throw new Error()
       const json = await res.json()
@@ -181,6 +233,7 @@ function StopFinderPanel({ stopId }) {
     }
   }
 
+  // Updates suggestions as the user types; numeric input skips name search
   function handleInputChange(e) {
     const val = e.target.value
     setInput(val)
@@ -194,6 +247,7 @@ function StopFinderPanel({ stopId }) {
       return
     }
 
+    // Filter the in-memory index and show up to 6 matching stops
     if (stopIndex !== null) {
       const q = trimmed.toLowerCase()
       const matches = stopIndex
@@ -208,6 +262,7 @@ function StopFinderPanel({ stopId }) {
     setActiveIdx(-1)
   }
 
+  // Handles ArrowUp/Down navigation within the dropdown and Enter/Escape
   function handleKeyDown(e) {
     if (!showDropdown || suggestions.length === 0) {
       if (e.key === 'Enter') fetchStop()
@@ -221,6 +276,7 @@ function StopFinderPanel({ stopId }) {
       setActiveIdx(i => (i - 1 + suggestions.length) % suggestions.length)
     } else if (e.key === 'Enter') {
       e.preventDefault()
+      // If nothing is keyboard-highlighted, pick the first suggestion
       selectSuggestion(activeIdx >= 0 ? suggestions[activeIdx] : suggestions[0])
     } else if (e.key === 'Escape') {
       setShowDropdown(false)
@@ -228,6 +284,7 @@ function StopFinderPanel({ stopId }) {
     }
   }
 
+  // "Find" button handler — auto-selects first suggestion for name input, otherwise numeric fetch
   function handleFind() {
     const trimmed = input.trim()
     if (!/^\d+$/.test(trimmed) && suggestions.length > 0) {
@@ -237,7 +294,7 @@ function StopFinderPanel({ stopId }) {
     }
   }
 
-  // Triggered externally (e.g. map stop marker click)
+  // Triggered externally when the user clicks a stop marker on the map
   useEffect(() => {
     if (stopId == null) return
     setInput(String(stopId))
@@ -247,6 +304,7 @@ function StopFinderPanel({ stopId }) {
   }, [stopId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isNumericOnly  = /^\d+$/.test(input.trim())
+  // Show a "Building stop index…" hint only when the user is typing a name and index isn't ready
   const showIndexHint  = !indexReady && input.trim().length > 0 && !isNumericOnly
 
   const stop       = data?.stops?.[0]
@@ -260,7 +318,7 @@ function StopFinderPanel({ stopId }) {
         <div className="panel-heading">Real-time departures</div>
       </div>
 
-      {/* Search area lives outside panel-body so suggestions aren't clipped by overflow */}
+      {/* Search area sits outside panel-body so the dropdown isn't clipped by overflow:hidden */}
       <div className="stop-finder-search-area" ref={wrapperRef}>
         <div className="stop-finder-form">
           <input
@@ -282,6 +340,7 @@ function StopFinderPanel({ stopId }) {
           </button>
         </div>
 
+        {/* Spinner shown while the stop index is being built in the background */}
         {showIndexHint && (
           <div className="stop-index-hint">
             <span className="spinner" style={{ width: 10, height: 10 }} />
@@ -289,12 +348,14 @@ function StopFinderPanel({ stopId }) {
           </div>
         )}
 
+        {/* Name-search suggestion dropdown */}
         {showDropdown && suggestions.length > 0 && (
           <div className="stop-suggestions">
             {suggestions.map((s, i) => (
               <button
                 key={s.place_code}
                 className={`stop-suggestion-item${i === activeIdx ? ' active' : ''}`}
+                // onMouseDown instead of onClick to fire before the input's onBlur
                 onMouseDown={e => { e.preventDefault(); selectSuggestion(s) }}
               >
                 <span className="stop-suggestion-name">
@@ -315,6 +376,7 @@ function StopFinderPanel({ stopId }) {
           </div>
         )}
 
+        {/* Stop info and departures shown after a successful fetch */}
         {stop && (
           <>
             <div>

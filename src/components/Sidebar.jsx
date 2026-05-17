@@ -1,3 +1,12 @@
+/*
+ * Sidebar.jsx — Desktop left-panel container.
+ * Holds the nav tabs and renders all seven content panels inside panel-slot divs.
+ * All panels stay mounted at all times; CSS hides the inactive ones.
+ * On mobile the sidebar-wrapper is repositioned as a bottom sheet via CSS,
+ * and the sheet-open class drives the slide-up animation.
+ * Also handles the drag-to-resize handle on desktop.
+ */
+
 import { useState, useRef, useEffect } from 'react'
 import SearchPanel from './SearchPanel.jsx'
 import StopFinderPanel from './panels/StopFinderPanel.jsx'
@@ -9,11 +18,12 @@ import TripPlannerPanel from './panels/TripPlannerPanel.jsx'
 
 // ── Resize constants ──────────────────────────────────────────────────────────
 
-const SIDEBAR_WIDTH_KEY = 'mt-sidebar-width'
+const SIDEBAR_WIDTH_KEY = 'mt-sidebar-width'  // localStorage key for persisting width
 const MIN_WIDTH     = 280
 const MAX_WIDTH     = 600
 const DEFAULT_WIDTH = 380
 
+// Reads the last saved sidebar width from localStorage; falls back to DEFAULT_WIDTH
 function loadSavedWidth() {
   try {
     const n = parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY), 10)
@@ -23,6 +33,8 @@ function loadSavedWidth() {
 }
 
 // ── Nav icons ─────────────────────────────────────────────────────────────────
+
+// Each function below renders a small SVG icon for the corresponding sidebar tab
 
 function MapIcon() {
   return (
@@ -90,6 +102,7 @@ function DirectionsIcon() {
   )
 }
 
+// Chevron used for the collapse button
 function ChevronLeftIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -98,6 +111,7 @@ function ChevronLeftIcon() {
   )
 }
 
+// Panel registry — drives the nav tab list and the panel-slot rendering below
 const PANELS = [
   { id: 'map',     label: 'Live Map', Icon: MapIcon        },
   { id: 'stops',   label: 'Stops',    Icon: BusIcon        },
@@ -110,12 +124,28 @@ const PANELS = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+/*
+ * Props:
+ *   open            — whether the sidebar is expanded (desktop)
+ *   mobileSheetOpen — true when a non-map panel is active; slides up the bottom sheet
+ *   activePanel     — which tab is selected ('map' | 'stops' | 'planner' | …)
+ *   onPanelChange   — called with the new panel id when a tab is clicked
+ *   onToggle        — called to collapse/expand the sidebar
+ *   liveMapProps    — all props forwarded into SearchPanel (route input, etc.)
+ *   onTrackRoute    — called with a route id from RoutesPanel / TripPlannerPanel
+ *   stopId          — stop id passed to StopFinderPanel when a map stop is clicked
+ *   onStopSelect    — called with a stop when the user clicks a stop in a panel
+ *   favorites       — array of starred route IDs
+ *   onToggleFavorite — toggles a route in/out of favorites
+ *   onTripUpdate    — called with {from, to} coords when a trip is planned
+ */
 function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, liveMapProps, onTrackRoute, stopId, onStopSelect, favorites = [], onToggleFavorite, onTripUpdate }) {
+  // sidebarWidth — tracks the pixel width of the sidebar; initialized from localStorage
   const [sidebarWidth, setSidebarWidth] = useState(loadSavedWidth)
 
   const wrapperRef  = useRef(null)
-  const isDragging  = useRef(false)
-  const dragStart   = useRef(null)   // { x, width }
+  const isDragging  = useRef(false)    // true while the resize handle is being dragged
+  const dragStart   = useRef(null)     // stores { x, width } at drag start
   const handleRef   = useRef(null)
 
   // Sync DOM width whenever state or open/collapsed changes.
@@ -126,9 +156,10 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
     el.style.width = open ? `${sidebarWidth}px` : '0px'
   }, [sidebarWidth, open])
 
+  // Starts the drag-to-resize interaction on mousedown on the handle
   function handleResizeStart(e) {
     if (e.button !== 0) return                    // left-click only
-    if (window.innerWidth <= 768) return          // desktop only
+    if (window.innerWidth <= 768) return          // desktop only — no resize on mobile
     e.preventDefault()
 
     const el = wrapperRef.current
@@ -138,6 +169,7 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
     el?.classList.add('resizing')
     handleRef.current?.classList.add('is-dragging')
 
+    // Directly update DOM width during drag; React state update would be too slow
     function onMove(ev) {
       if (!isDragging.current) return
       const dx       = ev.clientX - dragStart.current.x
@@ -145,6 +177,7 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
       if (wrapperRef.current) wrapperRef.current.style.width = `${newWidth}px`
     }
 
+    // On mouseup, commit the final width to state and save to localStorage
     function onUp() {
       isDragging.current = false
 
@@ -164,12 +197,14 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
   }
 
   return (
+    // sheet-open class slides the wrapper up from the bottom on mobile
     <div ref={wrapperRef} className={`sidebar-wrapper${open ? '' : ' collapsed'}${mobileSheetOpen ? ' sheet-open' : ''}`}>
       <div className="sidebar">
 
-        {/* Mobile drag handle — decorative affordance, hidden on desktop */}
+        {/* Mobile drag handle — visual affordance at the top of the bottom sheet */}
         <div className="sheet-drag-handle" aria-hidden="true" />
 
+        {/* Vertical nav tabs */}
         <nav className="sidebar-nav">
           {PANELS.map(({ id, label, Icon }) => (
             <button
@@ -180,12 +215,14 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
               <Icon />
               <span className="nav-tab-text">
                 {label}
+                {/* Badge shows the number of starred routes on the Routes tab */}
                 {id === 'routes' && favorites.length > 0 && (
                   <span className="nav-tab-badge">{favorites.length}</span>
                 )}
               </span>
             </button>
           ))}
+          {/* Collapse button — hidden on mobile */}
           <button
             className="nav-collapse-btn"
             onClick={onToggle}
@@ -195,8 +232,8 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
           </button>
         </nav>
 
+        {/* Panel content area — all panels mounted; inactive ones hidden by CSS */}
         <div className="sidebar-content">
-          {/* All panels stay mounted — CSS hides inactive ones */}
           <div className={`panel-slot${activePanel === 'map'     ? ' panel-active' : ''}`}>
             <SearchPanel {...liveMapProps} />
           </div>
@@ -222,7 +259,7 @@ function Sidebar({ open, mobileSheetOpen, activePanel, onPanelChange, onToggle, 
 
       </div>
 
-      {/* Drag handle — sits at the right edge of the wrapper, desktop only */}
+      {/* Drag handle — right edge of the sidebar, desktop only */}
       <div
         ref={handleRef}
         className="sidebar-resize-handle"
