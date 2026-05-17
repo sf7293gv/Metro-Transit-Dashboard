@@ -6,6 +6,7 @@ import MapView from './components/MapView.jsx'
 import BusDetailPanel from './components/BusDetailPanel.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import MobileMapSearch from './components/MobileMapSearch.jsx'
+import UpdateToast from './components/UpdateToast.jsx'
 import './index.css'
 
 const REFRESH_INTERVAL = 30000
@@ -357,6 +358,7 @@ function App() {
         onPanelChange={setActivePanel}
         favorites={favorites}
       />
+      <UpdateToast />
     </div>
   )
 }

@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' means the new SW installs but waits — we control when it activates.
+      // 'autoUpdate' was silently swapping assets under users mid-session.
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'Metro_Transit.png', 'bus.png'],
       manifest: {
         name: 'Metro Transit Dashboard',
@@ -26,7 +28,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         cleanupOutdatedCaches: true,
+        // Take control of all clients as soon as the new SW activates.
         clientsClaim: true,
+        // Do NOT skip waiting automatically — the user (or close+reopen) triggers activation.
+        skipWaiting: false,
       },
     }),
   ],
